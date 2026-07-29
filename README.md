@@ -2,7 +2,7 @@
 
 **Environmental observation becomes trusted action only after correlation.**
 
-[Live observatory](https://abstrusimad.github.io/fieldsignal/) · [StudioNet contract](https://explorer-studio.genlayer.com/address/0x66127559067cB46dA87E974fb598ba0a44fBA75C)
+[Live application](https://abstrusimad.github.io/fieldsignal/) | [StudioNet contract](https://explorer-studio.genlayer.com/address/0x66127559067cB46dA87E974fb598ba0a44fBA75C)
 
 FieldSignal is a GenLayer-native environmental sensor integrity and incident-response network. Operators enroll calibrated instruments, transmit contextual readings, and ask validators to distinguish a credible anomaly from normal conditions or sensor failure. Consensus changes operational state: it can watch a signal, open an incident, quarantine an instrument, dispatch an inspection, and resolve field evidence into a confirmed event, false alarm, recalibration order, or escalation.
 
@@ -39,7 +39,17 @@ Validator output persists severity, confidence, reasoning, response instructions
 
 ## Interface
 
-FieldSignal is designed as an instrument, not a dashboard. Wallet entry is a calibration scope; the connected app uses a radial sensor observatory, waveform correlation queue, response array, and animated consensus telemetry. Wallet sessions persist across refresh.
+FieldSignal uses a technical blueprint language built around a two-axis decision field. The landing places the connected wallet as an operator origin; the application then plots every live sensor by protocol trust and corroboration history across four operational quadrants. Signal traces use a horizontal examination register, incidents and inspections follow a connected response plan, and every write exposes signature, consensus, acceptance, or failure in a stable execution title block.
+
+The design is responsive without changing its information model: the field becomes a square mobile chart and its active sensor annotation moves below it. Wallet sessions persist across refresh.
+
+## Design reservation
+
+| Property | Reserved value |
+| --- | --- |
+| Primary style | `blueprint-style` |
+| Layout skeleton | `quadrant-decision-field` |
+| Reservation | `design-fieldsignal-redesign-002` |
 
 ## Verify
 

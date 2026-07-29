@@ -3,17 +3,16 @@ import { computed, onMounted, ref } from "vue";
 import {
   Activity,
   AlertTriangle,
-  ArrowRight,
   Check,
   CircleDot,
   ExternalLink,
   FileCheck2,
-  LocateFixed,
+  Gauge,
   LogOut,
+  MapPin,
   Radio,
   RefreshCw,
   Satellite,
-  ScanLine,
   Sparkles,
   X,
 } from "lucide-vue-next";
@@ -27,21 +26,17 @@ import {
 } from "./services/genlayer";
 
 const STORAGE_KEY = "fieldsignal:wallet-connected";
-const modes = [
-  { id: "field", label: "Decision field", index: "01" },
-  { id: "signals", label: "Signal traces", index: "02" },
-  { id: "response", label: "Response plan", index: "03" },
-];
-
 const ready = ref(false);
 const wallet = ref(null);
 const client = ref(null);
 const connecting = ref(false);
 const loading = ref(false);
 const error = ref("");
-const mode = ref("field");
-const selected = ref("SEN-001");
-const modal = ref(null);
+const section = ref("survey");
+const selectedSensor = ref("SEN-001");
+const selectedSignal = ref("");
+const selectedResponse = ref("");
+const sheet = ref(null);
 const tx = ref({ open: false, stage: "", title: "", hash: "", error: "" });
 
 const overview = ref({});
@@ -66,60 +61,66 @@ const inspectionForm = ref({
   evidence_url: "https://github.com/AbstrusImad/fieldsignal",
 });
 
-const current = computed(
-  () => sensors.value.find((item) => item.id === selected.value) || sensors.value[0],
+const currentSensor = computed(
+  () =>
+    sensors.value.find((item) => item.id === selectedSensor.value) ||
+    sensors.value[0],
 );
-const currentStation = computed(() => station(current.value?.station_id));
-const hasData = computed(() => sensors.value.length > 0);
-const pendingSignals = computed(() => signals.value.filter((item) => item.status === "PENDING"));
-const txStep = computed(() => {
+const currentStation = computed(() =>
+  stations.value.find((item) => item.id === currentSensor.value?.station_id),
+);
+const currentSignal = computed(
+  () =>
+    signals.value.find((item) => item.id === selectedSignal.value) ||
+    signals.value[0],
+);
+const responseFiles = computed(() => [
+  ...incidents.value.map((item) => ({ ...item, kind: "incident" })),
+  ...inspections.value.map((item) => ({ ...item, kind: "inspection" })),
+]);
+const currentResponse = computed(
+  () =>
+    responseFiles.value.find((item) => item.id === selectedResponse.value) ||
+    responseFiles.value[0],
+);
+const txIndex = computed(() => {
   if (tx.value.stage === "signature") return 1;
   if (["submitted", "consensus"].includes(tx.value.stage)) return 2;
   if (tx.value.stage === "accepted") return 3;
   return 0;
 });
-const marks = computed(() =>
-  sensors.value.map((sensor, index) => {
-    const stationData = station(sensor.station_id);
-    const trust = Number(sensor.trust || 0);
-    const signalCount = Number(sensor.signal_count || 0);
-    return {
-      ...sensor,
-      x: clamp(trust + ((index % 3) - 1) * 7, 10, 92),
-      y: clamp(
-        22 + signalCount * 18 + Number(stationData?.sensor_count || 1) * 5 + ((index * 11) % 24),
-        11,
-        89,
-      ),
-    };
-  }),
-);
+const gaugeAngle = computed(() => {
+  const trust = Number(currentSensor.value?.trust || 0);
+  return -118 + (trust / 100) * 236;
+});
 
-function clamp(value, min, max) {
-  return Math.min(max, Math.max(min, value));
-}
-function station(id) {
-  return stations.value.find((item) => item.id === id);
+function short(value = "") {
+  return value ? `${value.slice(0, 6)}...${value.slice(-4)}` : "";
 }
 function sensorFor(id) {
   return sensors.value.find((item) => item.id === id);
 }
-function short(value = "") {
-  return value ? `${value.slice(0, 6)}...${value.slice(-4)}` : "";
+function stationFor(id) {
+  return stations.value.find((item) => item.id === id);
 }
-function setMode(next) {
-  mode.value = next;
-  modal.value = null;
+function switchSection(next) {
+  section.value = next;
+  sheet.value = null;
 }
-function selectSensor(id) {
-  selected.value = id;
+function pickSensor(id) {
+  selectedSensor.value = id;
 }
-function openSignal(sensor) {
-  if (sensor) selected.value = sensor.id;
-  modal.value = { type: "signal" };
+function pickSignal(id) {
+  selectedSignal.value = id;
+}
+function pickResponse(id) {
+  selectedResponse.value = id;
+}
+function openReading() {
+  sheet.value = { type: "signal" };
 }
 function openInspection(item) {
-  modal.value = { type: "inspection", item };
+  sheet.value = { type: "inspection", item };
 }
 
 async function restore() {
@@ -165,7 +166,7 @@ function logout() {
 }
 async function load({ quiet = false } = {}) {
   loading.value = true;
-  error.value = "";
+  if (!quiet) error.value = "";
   try {
     const values = [];
     for (const name of [
@@ -186,9 +187,9 @@ async function load({ quiet = false } = {}) {
       incidents.value,
       inspections.value,
     ] = values;
-    if (!sensors.value.some((item) => item.id === selected.value)) {
-      selected.value = sensors.value[0]?.id || "";
-    }
+    selectedSensor.value ||= sensors.value[0]?.id || "";
+    selectedSignal.value ||= signals.value[0]?.id || "";
+    selectedResponse.value ||= responseFiles.value[0]?.id || "";
   } catch (cause) {
     if (!quiet) error.value = formatError(cause);
   } finally {
@@ -196,7 +197,7 @@ async function load({ quiet = false } = {}) {
   }
 }
 async function transact(title, functionName, args) {
-  modal.value = null;
+  sheet.value = null;
   tx.value = { open: true, stage: "signature", title, hash: "", error: "" };
   try {
     const result = await writeContract({
@@ -217,401 +218,403 @@ async function transact(title, functionName, args) {
 }
 
 const submitSignal = () =>
-  transact("Transmit field signal", "submit_signal", [
-    current.value.id,
+  transact("Field reading", "submit_signal", [
+    currentSensor.value.id,
     signalForm.value.value,
     signalForm.value.observed_at,
     signalForm.value.context,
     signalForm.value.evidence_url,
   ]);
 const resolveSignal = (id) =>
-  transact("Correlate environmental signal", "resolve_signal", [id]);
+  transact("Signal correlation", "resolve_signal", [id]);
 const assignInspection = (incident) =>
-  transact("Dispatch field inspection", "assign_inspection", [
+  transact("Inspection dispatch", "assign_inspection", [
     incident.id,
     inspectionForm.value.plan,
   ]);
 const submitInspection = (inspection) =>
-  transact("Publish inspection findings", "submit_inspection", [
+  transact("Inspection evidence", "submit_inspection", [
     inspection.id,
     inspectionForm.value.findings,
     inspectionForm.value.evidence_url,
   ]);
 const reviewInspection = (id) =>
-  transact("Resolve field inspection", "resolve_inspection", [id]);
+  transact("Inspection review", "resolve_inspection", [id]);
 
 onMounted(restore);
 </script>
 
 <template>
-  <div v-if="!ready" class="boot-screen">
-    <span>FS / STN</span>
-    <div></div>
-    <b>Plotting public field state</b>
+  <div v-if="!ready" class="packing-screen">
+    <div class="packing-case"><i></i><b>FIELD SIGNAL</b><span>Preparing field kit</span></div>
   </div>
 
-  <main v-else-if="!wallet" class="blueprint-gate">
-    <div class="gate-register">
-      <span>GENLAYER / STUDIONET</span>
-      <span>PUBLIC ENVIRONMENTAL RECORD</span>
-      <span>REV. 02 / LIVE</span>
-    </div>
-
-    <div class="gate-field" aria-hidden="true">
-      <div class="axis axis-x"><span>CALIBRATION TRUST</span></div>
-      <div class="axis axis-y"><span>CORROBORATION</span></div>
-      <i v-for="n in 15" :key="n" :class="`gate-point point-${n}`"></i>
-      <div class="gate-vector vector-a"></div>
-      <div class="gate-vector vector-b"></div>
-      <span class="quadrant-label q1">VERIFIED BASELINE</span>
-      <span class="quadrant-label q2">CONTEXT WATCH</span>
-      <span class="quadrant-label q3">FIELD INCIDENT</span>
-      <span class="quadrant-label q4">CALIBRATION HOLD</span>
-    </div>
-
-    <section class="gate-title">
-      <small>DECISION COORDINATES FOR PHYSICAL-WORLD EVIDENCE</small>
-      <h1>Field<br />Signal</h1>
-      <p>
-        Environmental readings become accountable decisions through calibration history,
-        public evidence, and GenLayer validator consensus.
-      </p>
-    </section>
-
-    <section class="gate-origin">
-      <div class="origin-cross"><LocateFixed /></div>
-      <small>OPERATOR ORIGIN / WALLET GATE</small>
-      <strong>{{ overview.sensors || "08" }} sensors plotted on StudioNet</strong>
-      <button :disabled="connecting" @click="connect">
-        <CircleDot />
-        <span>{{ connecting ? "LOCATING WALLET..." : "PLACE OPERATOR ORIGIN" }}</span>
-        <ArrowRight />
+  <main v-else-if="!wallet" class="case-landing">
+    <div class="bench-grain"></div>
+    <section class="closed-case">
+      <div class="case-handle"><span></span></div>
+      <i v-for="n in 8" :key="n" :class="`case-bolt bolt-${n}`"></i>
+      <div class="case-stripe"></div>
+      <div class="case-brand">
+        <small>ENVIRONMENTAL EVIDENCE KIT</small>
+        <h1>FIELD<br />SIGNAL</h1>
+        <p>STUDIONET / UNIT FS-06</p>
+      </div>
+      <div class="condition-dial">
+        <span>FIELD STATE</span>
+        <div><i></i><b>LIVE</b></div>
+      </div>
+      <div class="case-manifest">
+        <span><b>{{ overview.stations || "06" }}</b> STATIONS</span>
+        <span><b>{{ overview.sensors || "08" }}</b> SENSORS</span>
+        <span><b>{{ overview.signals || "03" }}</b> REPORTS</span>
+      </div>
+      <div class="case-sticker">
+        <MapPin />
+        <span>CORRELATE<br />BEFORE ACTION</span>
+      </div>
+      <button class="unlock-latch" :disabled="connecting" @click="connect">
+        <span class="latch-ring"><i></i></span>
+        <b>{{ connecting ? "RELEASING" : "UNLOCK" }}</b>
+        <small>WITH WALLET</small>
       </button>
-      <p v-if="error">{{ error }}</p>
-    </section>
-
-    <div class="gate-index">
-      <span><b>{{ overview.stations || "06" }}</b> stations</span>
-      <span><b>{{ overview.signals || "03" }}</b> signals</span>
-      <span><b>{{ overview.open_incidents || "02" }}</b> open incidents</span>
-      <a :href="`${explorerUrl}/address/${contractAddress}`" target="_blank">
-        Contract sheet <ExternalLink />
+      <div class="catch catch-left"></div>
+      <div class="catch catch-right"></div>
+      <p v-if="error" class="landing-error">{{ error }}</p>
+      <a
+        class="case-serial"
+        :href="`${explorerUrl}/address/${contractAddress}`"
+        target="_blank"
+      >
+        CONTRACT {{ short(contractAddress) }} <ExternalLink />
       </a>
-    </div>
+    </section>
+    <p class="landing-caption">Physical claims / public evidence / validator response</p>
   </main>
 
-  <div v-else class="field-system">
-    <header class="drawing-header">
-      <button class="wordmark" title="Decision field" @click="setMode('field')">
-        <span>FS</span>
-        <b>FieldSignal</b>
-      </button>
-      <nav>
-        <button
-          v-for="item in modes"
-          :key="item.id"
-          :class="{ active: mode === item.id }"
-          @click="setMode(item.id)"
-        >
-          <small>{{ item.index }}</small>
-          <span>{{ item.label }}</span>
-        </button>
-      </nav>
-      <div class="header-tools">
-        <span class="network"><i></i> StudioNet</span>
-        <a
-          :href="`${explorerUrl}/address/${contractAddress}`"
-          target="_blank"
-          title="Open contract in explorer"
-        >
-          <ExternalLink />
-        </a>
-        <button :class="{ spin: loading }" title="Refresh chain state" @click="load">
-          <RefreshCw />
-        </button>
-        <button title="Disconnect wallet" @click="logout"><LogOut /></button>
-      </div>
-    </header>
-
-    <main v-if="mode === 'field'" class="decision-workspace">
-      <section class="decision-field">
-        <header class="sheet-caption">
-          <div>
-            <small>SHEET 01 / LIVE DECISION FIELD</small>
-            <h2>Environmental integrity map</h2>
-          </div>
-          <p>
-            Coordinates combine on-chain sensor trust, signal history, and station
-            corroboration.
-          </p>
-        </header>
-
-        <div class="plot">
-          <div class="plot-axis plot-x"><span>CALIBRATION TRUST</span></div>
-          <div class="plot-axis plot-y"><span>CORROBORATION</span></div>
-          <div class="quad quad-watch"><b>CONTEXT WATCH</b><small>Q-02</small></div>
-          <div class="quad quad-verified"><b>VERIFIED BASELINE</b><small>Q-01</small></div>
-          <div class="quad quad-hold"><b>CALIBRATION HOLD</b><small>Q-04</small></div>
-          <div class="quad quad-incident"><b>FIELD INCIDENT</b><small>Q-03</small></div>
-
-          <button
-            v-for="mark in marks"
-            :key="mark.id"
-            class="sensor-mark"
-            :class="{
-              selected: current?.id === mark.id,
-              attention: mark.status !== 'ACTIVE' || Number(mark.signal_count) > 0,
-            }"
-            :style="{ left: `${mark.x}%`, bottom: `${mark.y}%` }"
-            :aria-label="`${mark.id} ${mark.metric}`"
-            @click="selectSensor(mark.id)"
-          >
-            <i></i><span>{{ mark.id.replace("SEN-", "") }}</span>
+  <main v-else class="field-bench">
+    <div class="bench-grain"></div>
+    <section class="open-kit">
+      <div class="kit-lid">
+        <div class="lid-pocket">
+          <span>FIELD SIGNAL</span>
+          <small>Environmental integrity kit / StudioNet</small>
+        </div>
+        <div class="lid-map">
+          <i v-for="n in 6" :key="n" :class="`map-pin pin-${n}`"></i>
+          <svg viewBox="0 0 500 110" preserveAspectRatio="none" aria-hidden="true">
+            <path d="M5 80 C80 20 125 100 190 48 S310 12 360 66 S430 100 495 28" />
+          </svg>
+        </div>
+        <div class="kit-utilities">
+          <span class="wallet-tag"><i></i>{{ short(wallet) }}</span>
+          <a :href="`${explorerUrl}/address/${contractAddress}`" target="_blank" title="Contract">
+            <ExternalLink />
+          </a>
+          <button :class="{ spinning: loading }" title="Reload field state" @click="load()">
+            <RefreshCw />
           </button>
-          <div v-if="current" class="selection-vector"></div>
+          <button title="Pack and disconnect" @click="logout"><LogOut /></button>
+        </div>
+      </div>
+
+      <div class="case-tray">
+        <nav class="fabric-tabs" aria-label="Field files">
+          <button :class="{ active: section === 'survey' }" @click="switchSection('survey')">
+            <Gauge /><span>SURVEY</span><small>01</small>
+          </button>
+          <button :class="{ active: section === 'traces' }" @click="switchSection('traces')">
+            <Radio /><span>TRACES</span><small>02</small>
+          </button>
+          <button :class="{ active: section === 'response' }" @click="switchSection('response')">
+            <FileCheck2 /><span>RESPONSE</span><small>03</small>
+          </button>
+        </nav>
+
+        <div class="file-stack">
+          <i class="folder-back back-one"></i>
+          <i class="folder-back back-two"></i>
+
+          <article v-if="section === 'survey' && currentSensor" class="active-file survey-file">
+            <div class="file-tab"><span>{{ currentSensor.id }}</span></div>
+            <div class="sensor-index">
+              <button
+                v-for="sensor in sensors"
+                :key="sensor.id"
+                :class="{ active: sensor.id === currentSensor.id, flagged: sensor.status !== 'ACTIVE' || Number(sensor.signal_count) > 0 }"
+                @click="pickSensor(sensor.id)"
+              >
+                <span>{{ sensor.id.slice(-2) }}</span>
+                <small>{{ sensor.metric }}</small>
+              </button>
+            </div>
+
+            <section class="field-report">
+              <header class="report-heading">
+                <div>
+                  <small>INSTRUMENT FIELD RECORD</small>
+                  <h2>{{ currentSensor.metric }}</h2>
+                  <p><MapPin /> {{ currentStation?.name }} / {{ currentStation?.region }}</p>
+                </div>
+                <span class="status-lamp" :class="currentSensor.status.toLowerCase()">
+                  <i></i>{{ currentSensor.status }}
+                </span>
+              </header>
+
+              <div class="instrument-cluster">
+                <div class="analog-gauge">
+                  <div class="gauge-face">
+                    <i v-for="n in 17" :key="n" :style="{ transform: `rotate(${-120 + n * 15}deg)` }"></i>
+                    <span class="needle" :style="{ transform: `rotate(${gaugeAngle}deg)` }"></span>
+                    <b>{{ currentSensor.trust }}</b>
+                    <small>TRUST</small>
+                  </div>
+                </div>
+                <div class="baseline-tape">
+                  <small>REFERENCE BAND</small>
+                  <strong>{{ currentSensor.baseline }}</strong>
+                  <span>{{ currentSensor.unit }}</span>
+                  <p>Calibration source attached / {{ currentSensor.signal_count }} reports filed</p>
+                  <a :href="currentSensor.calibration_url" target="_blank">OPEN SOURCE <ExternalLink /></a>
+                </div>
+                <div class="station-punches">
+                  <span v-for="station in stations" :key="station.id" :class="{ active: station.id === currentStation?.id }">
+                    <i></i>{{ station.id.slice(-2) }}
+                  </span>
+                </div>
+              </div>
+
+              <div class="field-note">
+                <b>Operator note</b>
+                <p>
+                  Compare a new reading with the instrument band, local context,
+                  neighboring behavior, and public evidence before requesting a
+                  validator conclusion.
+                </p>
+              </div>
+
+              <button class="push-control" @click="openReading">
+                <span><Activity /></span>
+                <b>LOG READING</b>
+                <small>press to prepare field sheet</small>
+              </button>
+            </section>
+          </article>
+
+          <article v-else-if="section === 'traces'" class="active-file trace-file">
+            <div class="file-tab orange-tab"><span>SIGNAL TRACES</span></div>
+            <div class="dossier-tabs">
+              <button
+                v-for="(signal, index) in signals"
+                :key="signal.id"
+                :class="{ active: currentSignal?.id === signal.id }"
+                @click="pickSignal(signal.id)"
+              >
+                <b>{{ String(index + 1).padStart(2, "0") }}</b>
+                <span>{{ signal.id }}</span>
+                <i :class="signal.status.toLowerCase()"></i>
+              </button>
+            </div>
+
+            <section v-if="currentSignal" class="signal-dossier">
+              <div class="dossier-head">
+                <span>PUBLIC OBSERVATION / {{ currentSignal.id }}</span>
+                <small>{{ currentSignal.observed_at }}</small>
+              </div>
+              <div class="sample-label">
+                <small>{{ currentSignal.sensor_id }} / {{ sensorFor(currentSignal.sensor_id)?.metric }}</small>
+                <strong>{{ currentSignal.value }}</strong>
+                <p>{{ stationFor(sensorFor(currentSignal.sensor_id)?.station_id)?.name }}</p>
+              </div>
+              <div class="trace-paper">
+                <div class="trace-ink">
+                  <i
+                    v-for="n in 38"
+                    :key="n"
+                    :style="{ height: `${8 + ((n * (Number(currentSignal.severity) || 17)) % 48)}px` }"
+                  ></i>
+                </div>
+                <p>{{ currentSignal.analysis || currentSignal.context }}</p>
+              </div>
+              <div class="evidence-tape">
+                <span>EVIDENCE</span>
+                <a :href="currentSignal.evidence_url" target="_blank">
+                  public source <ExternalLink />
+                </a>
+              </div>
+              <div class="verdict-stamp" :class="currentSignal.status.toLowerCase()">
+                <b>{{ currentSignal.verdict || currentSignal.status }}</b>
+                <small v-if="currentSignal.confidence">{{ currentSignal.confidence }}% CONFIDENCE</small>
+              </div>
+              <button
+                v-if="currentSignal.status === 'PENDING'"
+                class="stamp-control"
+                @click="resolveSignal(currentSignal.id)"
+              >
+                <span><Sparkles /></span>
+                <b>RUN CONSENSUS</b>
+              </button>
+            </section>
+            <div v-else class="empty-file"><Radio /><b>No reports filed</b><span>Use the Survey file to log a reading.</span></div>
+          </article>
+
+          <article v-else class="active-file response-file">
+            <div class="file-tab cyan-tab"><span>FIELD RESPONSE</span></div>
+            <div class="response-tabs">
+              <button
+                v-for="item in responseFiles"
+                :key="item.id"
+                :class="{ active: currentResponse?.id === item.id, inspection: item.kind === 'inspection' }"
+                @click="pickResponse(item.id)"
+              >
+                <span>{{ item.id }}</span>
+                <small>{{ item.status }}</small>
+              </button>
+            </div>
+
+            <section v-if="currentResponse" class="response-sheet">
+              <div class="clip"><i></i></div>
+              <template v-if="currentResponse.kind === 'incident'">
+                <div class="response-number">{{ currentResponse.id }}</div>
+                <small>INCIDENT / {{ currentResponse.station_id }}</small>
+                <h2>{{ currentResponse.title }}</h2>
+                <div class="severity-meter">
+                  <span>SEVERITY</span><b>{{ currentResponse.severity }}</b>
+                  <i><u :style="{ width: `${currentResponse.severity}%` }"></u></i>
+                </div>
+                <div class="hand-note">
+                  <span>Required field response</span>
+                  <p>{{ currentResponse.response }}</p>
+                </div>
+                <div class="route-thread">
+                  <i class="done"></i><span>Signal {{ currentResponse.signal_id }}</span>
+                  <b></b>
+                  <i :class="{ done: currentResponse.inspection_id }"></i>
+                  <span>{{ currentResponse.inspection_id || "Inspection unassigned" }}</span>
+                </div>
+                <button
+                  v-if="!currentResponse.inspection_id"
+                  class="pull-action"
+                  @click="assignInspection(currentResponse)"
+                >
+                  <span>DISPATCH INSPECTION</span><i></i>
+                </button>
+              </template>
+              <template v-else>
+                <div class="response-number">{{ currentResponse.id }}</div>
+                <small>INSPECTION / {{ currentResponse.incident_id }}</small>
+                <h2>{{ currentResponse.verdict || "Field inspection" }}</h2>
+                <div class="assignee-tag">
+                  <span>ASSIGNED TO</span><b>{{ short(currentResponse.assignee) }}</b>
+                </div>
+                <div class="hand-note">
+                  <span>{{ currentResponse.findings ? "Published findings" : "Field plan" }}</span>
+                  <p>{{ currentResponse.analysis || currentResponse.findings || currentResponse.plan }}</p>
+                </div>
+                <a
+                  v-if="currentResponse.evidence_url"
+                  class="evidence-label"
+                  :href="currentResponse.evidence_url"
+                  target="_blank"
+                >
+                  EVIDENCE ATTACHED <ExternalLink />
+                </a>
+                <button
+                  v-if="currentResponse.status === 'ASSIGNED'"
+                  class="pull-action"
+                  @click="openInspection(currentResponse)"
+                >
+                  <span>FILE FINDINGS</span><i></i>
+                </button>
+                <button
+                  v-if="currentResponse.status === 'PENDING_REVIEW'"
+                  class="pull-action review-pull"
+                  @click="reviewInspection(currentResponse.id)"
+                >
+                  <span>REVIEW EVIDENCE</span><i></i>
+                </button>
+                <div v-if="currentResponse.verdict" class="final-stamp">{{ currentResponse.verdict }}</div>
+              </template>
+            </section>
+            <div v-else class="empty-file"><Check /><b>No response files</b><span>No signal has opened a field incident.</span></div>
+          </article>
         </div>
 
-        <footer class="plot-legend">
-          <span><i class="legend-active"></i> Active sensor</span>
-          <span><i class="legend-alert"></i> Signal history</span>
-          <span>Y / evidence corroboration</span>
-          <span>X / protocol trust</span>
-        </footer>
-      </section>
+        <div class="tray-counter">
+          <span><i></i> STUDIONET</span>
+          <b>{{ overview.stations || 0 }}</b><small>stations</small>
+          <b>{{ overview.sensors || 0 }}</b><small>sensors</small>
+          <b>{{ overview.open_incidents || 0 }}</b><small>open</small>
+        </div>
+        <p v-if="error" class="pinned-error"><AlertTriangle /> {{ error }}</p>
+      </div>
+    </section>
 
-      <aside v-if="current" class="sensor-annotation">
+    <section v-if="sheet" class="report-layer">
+      <div class="clipboard">
+        <div class="board-clip"></div>
+        <button class="clip-close" title="Close report" @click="sheet = null"><X /></button>
         <header>
-          <span>ANNOTATION / {{ current.id }}</span>
-          <b>{{ current.status }}</b>
+          <small>FIELD SIGNAL / PUBLIC RECORD</small>
+          <span>{{ sheet.type === "signal" ? currentSensor?.id : sheet.item?.id }}</span>
+          <h2>{{ sheet.type === "signal" ? "Observation sheet" : "Inspection findings" }}</h2>
         </header>
-        <div class="annotation-title">
-          <small>{{ currentStation?.id }} / {{ currentStation?.region }}</small>
-          <h1>{{ current.metric }}</h1>
-          <p>{{ currentStation?.name }}</p>
-        </div>
-        <div class="measurement">
-          <span>REFERENCE BAND</span>
-          <strong>{{ current.baseline }}</strong>
-          <b>{{ current.unit }}</b>
-        </div>
-        <dl>
-          <div><dt>Protocol trust</dt><dd>{{ current.trust }}%</dd></div>
-          <div><dt>Signals filed</dt><dd>{{ current.signal_count }}</dd></div>
-          <div><dt>Station sensors</dt><dd>{{ currentStation?.sensor_count }}</dd></div>
-          <div><dt>Calibration</dt><dd><a :href="current.calibration_url" target="_blank">Source <ExternalLink /></a></dd></div>
-        </dl>
-        <button class="primary-action" @click="openSignal(current)">
-          <Activity />
-          <span>Transmit new reading</span>
-          <ArrowRight />
-        </button>
-        <div class="sheet-number">
-          <small>LIVE CONTRACT</small>
-          <span>{{ short(contractAddress) }}</span>
-          <b>FS-A1</b>
-        </div>
-      </aside>
-
-      <section v-else class="empty-sheet">
-        <ScanLine /><b>No sensor records returned</b><p>{{ error }}</p>
-      </section>
-    </main>
-
-    <main v-else-if="mode === 'signals'" class="trace-workspace">
-      <header class="workspace-heading">
-        <div>
-          <small>SHEET 02 / CONSENSUS TRACE REGISTER</small>
-          <h1>Readings under examination</h1>
-        </div>
-        <span>{{ pendingSignals.length }} awaiting validator consensus</span>
-      </header>
-
-      <section class="trace-sheet">
-        <div class="trace-scale">
-          <span>INGEST</span><span>CONTEXT</span><span>VALIDATION</span><span>VERDICT</span>
-        </div>
-        <article v-for="(signal, index) in signals" :key="signal.id" class="signal-trace">
-          <div class="trace-id">
-            <small>{{ String(index + 1).padStart(2, "0") }}</small>
-            <b>{{ signal.id }}</b>
-            <span>{{ signal.sensor_id }}</span>
-          </div>
-          <div class="trace-reading">
-            <small>{{ sensorFor(signal.sensor_id)?.metric }}</small>
-            <strong>{{ signal.value }}</strong>
-            <span>{{ signal.observed_at }}</span>
-          </div>
-          <div class="trace-line">
-            <i v-for="n in 22" :key="n" :style="{ height: `${8 + ((n * (Number(signal.severity) || 13) + index * 7) % 38)}px` }"></i>
-          </div>
-          <div class="trace-context">
-            <p>{{ signal.analysis || signal.context }}</p>
-            <a :href="signal.evidence_url" target="_blank">Evidence <ExternalLink /></a>
-          </div>
-          <div class="trace-verdict">
-            <span :class="signal.status.toLowerCase()">{{ signal.verdict || signal.status }}</span>
-            <small v-if="signal.confidence">{{ signal.confidence }}% confidence</small>
-            <button v-if="signal.status === 'PENDING'" @click="resolveSignal(signal.id)">
-              <Sparkles /> Run consensus
-            </button>
-          </div>
-        </article>
-        <div v-if="!signals.length" class="empty-register">
-          <Radio /><b>No signal records yet</b><p>Transmit a reading from the decision field.</p>
-        </div>
-      </section>
-    </main>
-
-    <main v-else class="response-workspace">
-      <header class="workspace-heading">
-        <div>
-          <small>SHEET 03 / FIELD RESPONSE PLAN</small>
-          <h1>From anomaly to accountable action</h1>
-        </div>
-        <span>{{ overview.open_incidents || 0 }} open incident routes</span>
-      </header>
-
-      <section class="response-plan">
-        <div class="plan-rail" aria-hidden="true"></div>
-        <article v-for="(incident, index) in incidents" :key="incident.id" class="incident-route">
-          <div class="route-node"><span>{{ String(index + 1).padStart(2, "0") }}</span></div>
-          <header>
-            <small>{{ incident.id }} / {{ incident.station_id }}</small>
-            <span>{{ incident.status }}</span>
-          </header>
-          <div class="route-body">
-            <div>
-              <h2>{{ incident.title }}</h2>
-              <p>{{ incident.response }}</p>
-            </div>
-            <div class="severity-gauge">
-              <strong>{{ incident.severity }}</strong>
-              <span>SEVERITY / 100</span>
-              <i><b :style="{ width: `${incident.severity}%` }"></b></i>
-            </div>
-          </div>
-          <footer>
-            <span>Source {{ incident.signal_id }}</span>
-            <button v-if="!incident.inspection_id" @click="assignInspection(incident)">
-              <LocateFixed /> Dispatch inspection
-            </button>
-            <span v-else>Linked {{ incident.inspection_id }}</span>
-          </footer>
-        </article>
-
-        <article v-for="inspection in inspections" :key="inspection.id" class="inspection-route">
-          <div class="route-node inspection-node"><FileCheck2 /></div>
-          <header>
-            <small>{{ inspection.id }} / {{ inspection.incident_id }}</small>
-            <span>{{ inspection.status }}</span>
-          </header>
-          <div class="route-body">
-            <div>
-              <h2>{{ inspection.verdict || "Field inspection" }}</h2>
-              <p>{{ inspection.analysis || inspection.findings || inspection.plan }}</p>
-            </div>
-            <div class="assignee">
-              <small>ASSIGNEE</small>
-              <span>{{ short(inspection.assignee) }}</span>
-            </div>
-          </div>
-          <footer>
-            <a v-if="inspection.evidence_url" :href="inspection.evidence_url" target="_blank">
-              Inspection evidence <ExternalLink />
-            </a>
-            <button v-if="inspection.status === 'ASSIGNED'" @click="openInspection(inspection)">
-              <FileCheck2 /> Submit findings
-            </button>
-            <button v-if="inspection.status === 'PENDING_REVIEW'" @click="reviewInspection(inspection.id)">
-              <Sparkles /> Resolve with consensus
-            </button>
-          </footer>
-        </article>
-
-        <div v-if="!incidents.length && !inspections.length" class="empty-register">
-          <Check /><b>No active response routes</b><p>Resolved readings have not opened an incident.</p>
-        </div>
-      </section>
-    </main>
-
-    <footer class="status-block">
-      <div><small>NETWORK</small><b>StudioNet</b></div>
-      <div><small>WALLET</small><b>{{ short(wallet) }}</b></div>
-      <div><small>STATIONS</small><b>{{ overview.stations || 0 }}</b></div>
-      <div><small>SENSORS</small><b>{{ overview.sensors || 0 }}</b></div>
-      <div><small>OPEN ROUTES</small><b>{{ overview.open_incidents || 0 }}</b></div>
-      <p v-if="error"><AlertTriangle /> {{ error }}</p>
-    </footer>
-
-    <div v-if="modal" class="input-overlay" @click.self="modal = null">
-      <section class="input-sheet">
-        <header>
-          <div><small>FIELD INPUT / PUBLIC RECORD</small><b>FS-FORM / 01</b></div>
-          <button title="Close" @click="modal = null"><X /></button>
-        </header>
-        <div class="input-intro">
-          <span>{{ modal.type === "signal" ? current?.id : modal.item?.id }}</span>
-          <h2>{{ modal.type === "signal" ? "Transmit a field reading" : "Publish inspection findings" }}</h2>
-          <p>Every submitted field becomes part of the StudioNet contract record.</p>
-        </div>
-        <form v-if="modal.type === 'signal'" @submit.prevent="submitSignal">
-          <label>
-            <span>Observed value</span>
-            <input v-model="signalForm.value" required maxlength="40" />
-          </label>
-          <label>
-            <span>Observation timestamp</span>
-            <input v-model="signalForm.observed_at" required />
-          </label>
-          <label class="wide">
-            <span>Environmental context / 60 characters minimum</span>
+        <form v-if="sheet.type === 'signal'" @submit.prevent="submitSignal">
+          <label><span>OBSERVED VALUE</span><input v-model="signalForm.value" required maxlength="40" /></label>
+          <label><span>UTC TIMESTAMP</span><input v-model="signalForm.observed_at" required /></label>
+          <label class="long-line">
+            <span>FIELD CONTEXT / MINIMUM 60 CHARACTERS</span>
             <textarea v-model="signalForm.context" required minlength="60" maxlength="1200"></textarea>
           </label>
-          <label class="wide">
-            <span>Public HTTPS evidence</span>
+          <label class="long-line">
+            <span>PUBLIC HTTPS EVIDENCE</span>
             <input v-model="signalForm.evidence_url" type="url" required />
           </label>
-          <button class="form-submit" type="submit">
-            <Satellite /><span>Transmit to StudioNet</span><ArrowRight />
+          <button class="guarded-lever" type="submit">
+            <i><Satellite /></i><span>PULL TO TRANSMIT</span><b></b>
           </button>
         </form>
-        <form v-else @submit.prevent="submitInspection(modal.item)">
-          <label class="wide">
-            <span>Inspection findings / 100 characters minimum</span>
+        <form v-else @submit.prevent="submitInspection(sheet.item)">
+          <label class="long-line">
+            <span>FIELD FINDINGS / MINIMUM 100 CHARACTERS</span>
             <textarea v-model="inspectionForm.findings" required minlength="100" maxlength="1800"></textarea>
           </label>
-          <label class="wide">
-            <span>Public HTTPS evidence</span>
+          <label class="long-line">
+            <span>PUBLIC HTTPS EVIDENCE</span>
             <input v-model="inspectionForm.evidence_url" type="url" required />
           </label>
-          <button class="form-submit" type="submit">
-            <FileCheck2 /><span>Publish findings</span><ArrowRight />
+          <button class="guarded-lever" type="submit">
+            <i><FileCheck2 /></i><span>PULL TO FILE</span><b></b>
           </button>
         </form>
-      </section>
-    </div>
+        <footer><span>Operator {{ short(wallet) }}</span><b>FS / ORIGINAL</b></footer>
+      </div>
+    </section>
 
-    <aside v-if="tx.open" class="execution-strip" :class="tx.stage">
-      <button class="tx-close" title="Close transaction status" @click="tx.open = false"><X /></button>
-      <div class="tx-title">
-        <small>GENLAYER EXECUTION TRACE</small>
-        <b>{{ tx.title }}</b>
-      </div>
-      <div class="tx-progress">
-        <div :class="{ active: txStep >= 1, failed: tx.stage === 'failed' }"><i>1</i><span>Wallet signature</span></div>
-        <div :class="{ active: txStep >= 2, failed: tx.stage === 'failed' }"><i>2</i><span>Validator consensus</span></div>
-        <div :class="{ active: txStep >= 3, failed: tx.stage === 'failed' }"><i>3</i><span>State accepted</span></div>
-      </div>
-      <div class="tx-result">
-        <ScanLine v-if="!['accepted', 'failed'].includes(tx.stage)" />
-        <Check v-else-if="tx.stage === 'accepted'" />
-        <AlertTriangle v-else />
-        <span v-if="tx.stage === 'signature'">Confirm the transaction in your wallet.</span>
-        <span v-else-if="['submitted', 'consensus'].includes(tx.stage)">Validators are examining calibration, context, and evidence.</span>
-        <span v-else-if="tx.stage === 'accepted'">The contract state has been updated.</span>
-        <span v-else>{{ tx.error }}</span>
-        <a v-if="tx.hash" :href="`${explorerUrl}/transactions/${tx.hash}`" target="_blank">Trace <ExternalLink /></a>
-      </div>
+    <aside v-if="tx.open" class="receipt-reel" :class="tx.stage">
+      <div class="printer-mouth"><i></i><i></i><i></i></div>
+      <section>
+        <button title="Tear off receipt" @click="tx.open = false"><X /></button>
+        <small>GENLAYER / EXECUTION RECEIPT</small>
+        <h3>{{ tx.title }}</h3>
+        <div class="receipt-stage" :class="{ done: txIndex >= 1, failed: tx.stage === 'failed' }">
+          <i></i><span>WALLET SIGNATURE</span><b>{{ txIndex >= 1 ? "MARKED" : "WAIT" }}</b>
+        </div>
+        <div class="receipt-stage" :class="{ done: txIndex >= 2, failed: tx.stage === 'failed' }">
+          <i></i><span>VALIDATOR REVIEW</span><b>{{ txIndex >= 2 ? "RUNNING" : "WAIT" }}</b>
+        </div>
+        <div class="receipt-stage" :class="{ done: txIndex >= 3, failed: tx.stage === 'failed' }">
+          <i></i><span>CONTRACT STATE</span><b>{{ txIndex >= 3 ? "ACCEPTED" : "WAIT" }}</b>
+        </div>
+        <p v-if="tx.stage === 'signature'">Confirm this field action in the connected wallet.</p>
+        <p v-else-if="['submitted', 'consensus'].includes(tx.stage)">Validators are correlating the record and its evidence.</p>
+        <p v-else-if="tx.stage === 'accepted'">Receipt accepted. Live files have been refreshed.</p>
+        <p v-else>{{ tx.error }}</p>
+        <a v-if="tx.hash" :href="`${explorerUrl}/transactions/${tx.hash}`" target="_blank">
+          TRACE {{ short(tx.hash) }} <ExternalLink />
+        </a>
+        <div class="receipt-teeth"></div>
+      </section>
     </aside>
-  </div>
+  </main>
 </template>

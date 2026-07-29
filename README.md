@@ -117,18 +117,18 @@ The Intelligent Contract is implemented in [`contracts/fieldsignal.py`](contract
 
 `get_overview`, `get_stations`, `get_sensors`, `get_signals`, `get_incidents`, and `get_inspections` expose JSON-safe records used by the live interface.
 
-## 05 / Operator surface
+## 05 / Operator field kit
 
-The interface treats environmental integrity as a decision field rather than a generic dashboard.
+The interface behaves like physical environmental equipment rather than a dashboard.
 
-- **Wallet gate:** the disconnected landing establishes the wallet as an operator origin. A previous connection is restored silently after refresh when the wallet still exposes the authorized account.
-- **Decision field:** live sensors are plotted across calibration trust and corroboration dimensions. Selecting a point reveals its station, baseline, trust, signal history, and calibration source.
-- **Signal traces:** submitted observations appear as examination traces with value, time, context, evidence, validator analysis, confidence, and verdict.
-- **Response plan:** incidents and inspections form linked operational routes rather than unrelated cards.
-- **Write sheets:** signal and inspection submissions enforce the same input boundaries as the contract before asking for a wallet signature.
-- **Execution trace:** every write exposes signature, validator consensus, acceptance, and human-readable failure states.
+- **Wallet latch:** the disconnected landing is a closed weatherproof case. Wallet authorization rotates the central latch and opens the kit; a previous connection is restored silently after refresh when the wallet still exposes the authorized account.
+- **Survey file:** sensors live behind staggered index tabs. The active instrument file combines an analog trust gauge, reference tape, station punches, calibration source, report count, and a spring-loaded reading control.
+- **Trace dossier:** submitted observations become stacked evidence folders containing sample labels, ink traces, validator analysis, source tape, confidence, and rubber verdict stamps.
+- **Response clipboard:** incidents and inspections share one clipped field sheet with severity instruments, handwritten instructions, route thread, assignee label, and pull-tab actions.
+- **Observation sheets:** writes use ruled reports and a guarded mechanical lever while enforcing the same input boundaries as the contract.
+- **Execution receipt:** every write feeds a perforated receipt through signature, validator review, acceptance, or a human-readable failure.
 
-On mobile, the decision surface becomes a square focused chart, the active annotation moves below it, trace records recompose into readable sheets, and response routes retain their lifecycle order.
+On mobile, the case becomes a handheld vertical kit: fabric tabs move to the thumb edge, sensor folders scroll as a compact index, reports remain full-width artifacts, and the receipt reel stays attached to the active action.
 
 ## 06 / Transaction trace
 

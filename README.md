@@ -3,7 +3,7 @@
 > **Field note 01:** a sensor reading is a claim about the physical world.
 > FieldSignal makes that claim survive calibration checks, public evidence, validator reasoning, and accountable response before it becomes an incident.
 
-[Open the live decision field](https://abstrusimad.github.io/fieldsignal/) | [Inspect the StudioNet contract](https://explorer-studio.genlayer.com/address/0x66127559067cB46dA87E974fb598ba0a44fBA75C) | [Review the deployment transaction](https://explorer-studio.genlayer.com/tx/0xf9b20fdbba84dbf783c4b396c14ebfd5636ab113f7fb866eb7ef7ee26728381c)
+[Open the live decision field](https://abstrusimad.github.io/fieldsignal/) | [Inspect the Bradbury contract](https://explorer-bradbury.genlayer.com/address/0x42a6982fA6bAD35b3FE4A0E21c162a07195D18Cb) | [Review the deployment transaction](https://explorer-bradbury.genlayer.com/tx/0xea062a0b11bb9532b6f30e2f6b0344608400aeaefd2b8f116953563b911e5356)
 
 ## 00 / The observation problem
 
@@ -13,19 +13,22 @@ FieldSignal is a GenLayer-native integrity and response protocol for that bounda
 
 ## 01 / Live plate
 
-The public deployment is populated with real StudioNet records. The frontend reads this contract directly and does not ship a mocked protocol dataset.
+The public deployment is populated with the verified records from the original StudioNet protocol. The frontend reads Bradbury directly and does not ship a mocked protocol dataset.
 
 | Coordinate | Live value |
 | --- | ---: |
-| Network | GenLayer StudioNet |
-| Contract | `0x66127559067cB46dA87E974fb598ba0a44fBA75C` |
-| Deployment transaction | `0xf9b20fdbba84dbf783c4b396c14ebfd5636ab113f7fb866eb7ef7ee26728381c` |
+| Network | GenLayer Bradbury Testnet |
+| Contract | `0x42a6982fA6bAD35b3FE4A0E21c162a07195D18Cb` |
+| Deployment transaction | `0xea062a0b11bb9532b6f30e2f6b0344608400aeaefd2b8f116953563b911e5356` |
+| Migration transaction | `0x94fbf701cbd7f4f6932c00c33783663efd663a555a89fdf5ecc01c103b95d6f5` |
+| Snapshot SHA-256 | `e4ac9c7255e9773df4929b7bacebdb6ea086430af2959f3c16753fd87db2f28f` |
 | Monitoring stations | 6 |
 | Registered sensors | 8 |
-| Submitted signals | 3 |
+| Submitted signals | 5 |
 | Durable incidents | 2 |
 | Field inspections | 1 |
-| Seed activity transactions | 8 accepted |
+| Migrated records | 22 |
+| Accepted source transactions | 8 |
 
 The deployed field covers air quality, soil moisture, dissolved oxygen, wet-bulb temperature, water level, wind speed, and turbidity across industrial, agricultural, coastal, residential, wetland, and upland contexts.
 
@@ -58,7 +61,7 @@ GENLAYER VALIDATOR CORRELATION
        CONFIRMED / FALSE_ALARM / RECALIBRATE / ESCALATE
 ```
 
-The first consensus decides what the observation means. The second decides what the physical inspection proves. Both decisions are normalized to bounded enums before any storage mutation occurs.
+The first consensus decides what the observation means. The second decides what the physical inspection proves. Both decisions are normalized to bounded enums before any storage mutation occurs. On Bradbury, validators independently repeat the assessment and compare verdicts, severity, and confidence against the leader instead of accepting a well-shaped leader response on structure alone.
 
 ## 03 / Intelligence under constraint
 
@@ -112,6 +115,7 @@ The Intelligent Contract is implemented in [`contracts/fieldsignal.py`](contract
 | `assign_inspection` | Attach a field plan and assignee to an incident | Incident exists and has no inspection |
 | `submit_inspection` | Publish field findings and evidence | Assigned inspection, 100-1800 character findings |
 | `resolve_inspection` | Run validator review of the field evidence | Inspection must be ready for review |
+| `import_snapshot` | Reconstruct the verified source state once | Owner-only, migration-mode, exact hash and count guards |
 
 ### Public views
 
@@ -142,7 +146,7 @@ sequenceDiagram
 
     Operator->>App: Submit observation or inspection evidence
     App->>Wallet: Request signature
-    Wallet-->>App: Signed StudioNet transaction
+    Wallet-->>App: Signed Bradbury transaction
     App->>Contract: Persist pending action
     Contract->>Validators: Execute bounded reasoning task
     Validators-->>Contract: Normalized verdict and analysis
@@ -151,7 +155,7 @@ sequenceDiagram
     App->>App: Reload live contract state
 ```
 
-The client retries transient StudioNet saturation responses with bounded backoff. Contract rejections are decoded from GenVM receipts so the interface does not collapse failures into `[object Object]`.
+The client retries transient Bradbury saturation responses with bounded backoff. Contract rejections are decoded from GenVM receipts, retain their transaction hash, and link to the canonical `/tx/<hash>` explorer route instead of collapsing failures into `[object Object]`.
 
 ## 07 / Run the instrument
 
@@ -159,7 +163,7 @@ The client retries transient StudioNet saturation responses with bounded backoff
 
 - Node.js 20 or newer
 - pnpm 9
-- A browser wallet compatible with GenLayer StudioNet
+- A browser wallet compatible with GenLayer Bradbury
 - Python and GenLayer tooling for contract verification
 
 ### Frontend
@@ -210,31 +214,42 @@ cd app
 pnpm run build
 ```
 
-The browser verification pass covers the disconnected wallet gate, persistent re-entry, all six StudioNet reads, the three operational views, write forms, transaction lifecycle placement, full-width desktop rendering, and mobile overflow.
+Exact network-state verification:
 
-## 09 / Deploy and seed
+```bash
+pnpm run snapshot:build
+pnpm run verify:live
+```
+
+The browser verification pass covers the disconnected wallet gate, persistent re-entry, all six Bradbury reads, the three operational views, write forms, transaction lifecycle placement, full-width desktop rendering, and mobile overflow.
+
+## 09 / Deploy and migrate
 
 From the repository root:
 
 ```bash
 pnpm install
+pnpm run snapshot:build
 pnpm run deploy
-pnpm run seed
+pnpm run snapshot:import
+pnpm run verify:live
 ```
 
-The deployment script writes public metadata to `deployments/studionet.json` and public frontend values to `app/.env.production`. The seeding script creates accepted StudioNet activity for the interface's core states. Neither file contains the private key.
+The source audit first captured all six read surfaces from StudioNet. `snapshot:build` converts that capture into one canonical 8,688-byte payload and SHA-256 manifest. The Bradbury contract starts empty in migration mode; an owner-only transaction imports exactly 6 stations, 8 sensors, 5 signals, 2 incidents, and 1 inspection. The method rejects altered hashes, unexpected source coordinates, incorrect counts, non-empty state, and repeated imports. `verify:live` then reads every collection from Bradbury and compares every field with the canonical payload.
+
+Deployment metadata is written to `deployments/bradbury.json`; public frontend values go to the ignored `app/.env.production`. Neither file contains the private key.
 
 ## 10 / Repository bearings
 
 ```text
 fieldsignal/
-|-- app/                       Vue interface and StudioNet client
+|-- app/                       Vue interface and Bradbury client
 |   |-- src/App.vue            Wallet gate and operational surfaces
 |   |-- src/services/          GenLayer reads, writes, retries, receipt errors
 |   `-- .env.production        Public contract and explorer values
 |-- contracts/fieldsignal.py   Intelligent Contract
 |-- deployments/               Public deployment and activity receipts
-|-- scripts/                   StudioNet deployment and seeding
+|-- scripts/                   Source audit, migration, deployment, verification
 |-- tests/direct/              Direct-mode contract tests
 `-- README.md                  This field notebook
 ```
@@ -245,7 +260,8 @@ fieldsignal/
 - User input is bounded before validator execution.
 - Calibration and evidence sources must use HTTPS.
 - Lifecycle guards prevent duplicate resolution and duplicate inspection assignment.
-- Validator results are schema-checked and enum-restricted before state mutation.
+- Validator results are schema-checked, enum-restricted, and independently compared before state mutation.
+- Migration is owner-only, one-use, hash-locked, source-bound, and count-checked.
 - Trust and score updates are clamped to valid ranges.
 - The frontend displays public addresses and transaction hashes only.
 
@@ -254,8 +270,11 @@ fieldsignal/
 - **Live application:** https://abstrusimad.github.io/fieldsignal/
 - **Repository:** https://github.com/AbstrusImad/fieldsignal
 - **Publishing account:** [@AbstrusImad](https://github.com/AbstrusImad)
-- **StudioNet explorer:** https://explorer-studio.genlayer.com
-- **Contract:** `0x66127559067cB46dA87E974fb598ba0a44fBA75C`
+- **Bradbury explorer:** https://explorer-bradbury.genlayer.com
+- **Contract:** `0x42a6982fA6bAD35b3FE4A0E21c162a07195D18Cb`
+- **Deployment:** https://explorer-bradbury.genlayer.com/tx/0xea062a0b11bb9532b6f30e2f6b0344608400aeaefd2b8f116953563b911e5356
+- **State import:** https://explorer-bradbury.genlayer.com/tx/0x94fbf701cbd7f4f6932c00c33783663efd663a555a89fdf5ecc01c103b95d6f5
+- **Archived source:** https://explorer-studio.genlayer.com/address/0x66127559067cB46dA87E974fb598ba0a44fBA75C
 
 ---
 

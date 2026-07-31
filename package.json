@@ -1,1 +1,16 @@
-{"name":"fieldsignal-contracts","private":true,"type":"module","scripts":{"deploy":"node scripts/deploy-studionet.mjs","seed":"node scripts/seed-studionet.mjs"},"devDependencies":{"genlayer-js":"^1.1.8"},"packageManager":"pnpm@9.15.5"}
+{
+  "name": "fieldsignal-contracts",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "audit:source": "node scripts/audit-source-state.mjs",
+    "deploy": "node scripts/deploy-bradbury.mjs",
+    "snapshot:build": "node scripts/build-migration-payload.mjs",
+    "snapshot:import": "node scripts/import-bradbury-snapshot.mjs",
+    "verify:live": "node scripts/verify-bradbury.mjs"
+  },
+  "devDependencies": {
+    "genlayer-js": "^1.1.8"
+  },
+  "packageManager": "pnpm@9.15.5"
+}

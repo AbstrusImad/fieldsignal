@@ -1,13 +1,14 @@
 import { createClient } from "genlayer-js";
-import { studionet } from "genlayer-js/chains";
+import { testnetBradbury } from "genlayer-js/chains";
 import { ExecutionResult, TransactionStatus } from "genlayer-js/types";
 
 export const contractAddress =
   import.meta.env.VITE_CONTRACT_ADDRESS ||
-  "0x66127559067cB46dA87E974fb598ba0a44fBA75C";
+  "0x42a6982fA6bAD35b3FE4A0E21c162a07195D18Cb";
 export const explorerUrl =
-  import.meta.env.VITE_EXPLORER_URL || "https://explorer-studio.genlayer.com";
-export const publicClient = createClient({ chain: studionet });
+  import.meta.env.VITE_EXPLORER_URL ||
+  "https://explorer-bradbury.genlayer.com";
+export const publicClient = createClient({ chain: testnetBradbury });
 
 const stringify = (value) => {
   if (typeof value === "string") return value;
@@ -58,8 +59,8 @@ export async function connectWallet({ silent = false } = {}) {
   });
   const address = accounts?.[0];
   if (!address) return null;
-  const client = createClient({ chain: studionet, account: address });
-  if (!silent) await client.connect("studionet");
+  const client = createClient({ chain: testnetBradbury, account: address });
+  if (!silent) await client.connect("testnetBradbury");
   return { address, client };
 }
 
@@ -130,7 +131,7 @@ export async function writeContract({
 }) {
   if (!client) throw new Error("Connect your wallet first.");
   onStage?.("signature");
-  await client.connect("studionet");
+  await client.connect("testnetBradbury");
   const hash = await retry(() =>
     client.writeContract({ address: contractAddress, functionName, args }),
   );
@@ -144,7 +145,12 @@ export async function writeContract({
   const succeeded =
     receipt.txExecutionResultName === ExecutionResult.FINISHED_WITH_RETURN ||
     leader(receipt)?.execution_result === "SUCCESS";
-  if (!succeeded) throw new Error(receiptError(receipt));
+  if (!succeeded) {
+    const error = new Error(receiptError(receipt));
+    error.hash = hash;
+    error.receipt = receipt;
+    throw error;
+  }
   onStage?.("accepted", hash);
   return { hash, receipt };
 }

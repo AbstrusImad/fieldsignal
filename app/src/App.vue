@@ -212,6 +212,7 @@ async function transact(title, functionName, args) {
     tx.value.hash = result.hash;
     await load();
   } catch (cause) {
+    if (cause?.hash) tx.value.hash = cause.hash;
     tx.value.stage = "failed";
     tx.value.error = formatError(cause);
   }
@@ -258,7 +259,7 @@ onMounted(restore);
       <div class="case-brand">
         <small>ENVIRONMENTAL EVIDENCE KIT</small>
         <h1>FIELD<br />SIGNAL</h1>
-        <p>STUDIONET / UNIT FS-06</p>
+        <p>BRADBURY / UNIT FS-06</p>
       </div>
       <div class="condition-dial">
         <span>FIELD STATE</span>
@@ -267,7 +268,7 @@ onMounted(restore);
       <div class="case-manifest">
         <span><b>{{ overview.stations || "06" }}</b> STATIONS</span>
         <span><b>{{ overview.sensors || "08" }}</b> SENSORS</span>
-        <span><b>{{ overview.signals || "03" }}</b> REPORTS</span>
+        <span><b>{{ overview.signals || "05" }}</b> REPORTS</span>
       </div>
       <div class="case-sticker">
         <MapPin />
@@ -298,7 +299,7 @@ onMounted(restore);
       <div class="kit-lid">
         <div class="lid-pocket">
           <span>FIELD SIGNAL</span>
-          <small>Environmental integrity kit / StudioNet</small>
+          <small>Environmental integrity kit / Bradbury</small>
         </div>
         <div class="lid-map">
           <i v-for="n in 6" :key="n" :class="`map-pin pin-${n}`"></i>
@@ -541,7 +542,7 @@ onMounted(restore);
         </div>
 
         <div class="tray-counter">
-          <span><i></i> STUDIONET</span>
+          <span><i></i> BRADBURY</span>
           <b>{{ overview.stations || 0 }}</b><small>stations</small>
           <b>{{ overview.sensors || 0 }}</b><small>sensors</small>
           <b>{{ overview.open_incidents || 0 }}</b><small>open</small>
@@ -610,7 +611,7 @@ onMounted(restore);
         <p v-else-if="['submitted', 'consensus'].includes(tx.stage)">Validators are correlating the record and its evidence.</p>
         <p v-else-if="tx.stage === 'accepted'">Receipt accepted. Live files have been refreshed.</p>
         <p v-else>{{ tx.error }}</p>
-        <a v-if="tx.hash" :href="`${explorerUrl}/transactions/${tx.hash}`" target="_blank">
+        <a v-if="tx.hash" :href="`${explorerUrl}/tx/${tx.hash}`" target="_blank">
           TRACE {{ short(tx.hash) }} <ExternalLink />
         </a>
         <div class="receipt-teeth"></div>

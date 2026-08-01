@@ -39,10 +39,12 @@ class Sensor:
 class Signal:
     id: str
     sensor_id: str
+    reporter: Address
     value: str
     observed_at: str
     context: str
     evidence_url: str
+    evidence_fingerprint: str
     status: str
     verdict: str
     severity: u32
@@ -74,9 +76,11 @@ class Inspection:
     plan: str
     findings: str
     evidence_url: str
+    evidence_fingerprint: str
     status: str
     verdict: str
     analysis: str
+    response_assessment: str
 
 
 class FieldSignal(gl.Contract):
@@ -184,6 +188,25 @@ class FieldSignal(gl.Contract):
         if gl.message.sender_address != self.owner:
             raise gl.vm.UserError(f"{EXPECTED} Owner authorization required")
 
+    def _authorized_station_operator(self, station_id: str):
+        station = self.stations[station_id]
+        if gl.message.sender_address != station.operator:
+            raise gl.vm.UserError(
+                f"{EXPECTED} Only station operator can perform this action"
+            )
+
+    def _fingerprint(self, value: str, label: str):
+        if len(value) > 0 and (len(value) < 64 or len(value) > 128):
+            raise gl.vm.UserError(
+                f"{EXPECTED} {label} fingerprint must be 64-128 characters (SHA-256 hex)"
+            )
+        if len(value) > 0:
+            for char in value.lower():
+                if char not in "0123456789abcdef":
+                    raise gl.vm.UserError(
+                        f"{EXPECTED} {label} fingerprint must be hex encoded"
+                    )
+
     def _migration_expect(self, condition: bool, message: str):
         if not condition:
             raise gl.vm.UserError(f"{EXPECTED} Migration {message}")
@@ -256,13 +279,17 @@ class FieldSignal(gl.Contract):
             self.sensors[item.id] = item
 
         for record in data["signals"]:
+            reporter = record.get("reporter", record.get("sensor_id", ""))
+            reporter_address = Address(reporter) if isinstance(reporter, str) and reporter.startswith("0x") else Address("0x0000000000000000000000000000000000000000")
             item = Signal(
                 record["id"],
                 record["sensor_id"],
+                reporter_address,
                 record["value"],
                 record["observed_at"],
                 record["context"],
                 record["evidence_url"],
+                record.get("evidence_fingerprint", ""),
                 record["status"],
                 record["verdict"],
                 u32(record["severity"]),
@@ -296,9 +323,11 @@ class FieldSignal(gl.Contract):
                 record["plan"],
                 record["findings"],
                 record["evidence_url"],
+                record.get("evidence_fingerprint", ""),
                 record["status"],
                 record["verdict"],
                 record["analysis"],
+                record.get("response_assessment", ""),
             )
             self.inspection_ids.append(item.id)
             self.inspections[item.id] = item
@@ -335,6 +364,7 @@ class FieldSignal(gl.Contract):
     ) -> str:
         if station_id not in self.stations:
             raise gl.vm.UserError(f"{EXPECTED} Station not found")
+        self._authorized_station_operator(station_id)
         self._text(metric, "Metric", 2, 60)
         self._text(baseline, "Baseline", 2, 100)
         self._https(calibration_url)
@@ -364,22 +394,28 @@ class FieldSignal(gl.Contract):
         observed_at: str,
         context: str,
         evidence_url: str,
+        evidence_fingerprint: str = "",
     ) -> str:
         if sensor_id not in self.sensors:
             raise gl.vm.UserError(f"{EXPECTED} Sensor not found")
+        sensor = self.sensors[sensor_id]
+        self._authorized_station_operator(sensor.station_id)
         self._text(value, "Value", 1, 40)
         self._text(observed_at, "Observed at", 10, 60)
         self._text(context, "Context", 60, 1200)
         self._https(evidence_url)
+        self._fingerprint(evidence_fingerprint, "Evidence")
         item_id = f"SIG-{len(self.signal_ids)+1:04d}"
         self.signal_ids.append(item_id)
         self.signals[item_id] = Signal(
             item_id,
             sensor_id,
+            gl.message.sender_address,
             value,
             observed_at,
             context,
             evidence_url,
+            evidence_fingerprint,
             "PENDING",
             "",
             u32(0),
@@ -403,11 +439,18 @@ class FieldSignal(gl.Contract):
         sensor = self.sensors[signal.sensor_id]
         station = self.stations[sensor.station_id]
 
+        fingerprint_instruction = (
+            f" EVIDENCE FINGERPRINT {signal.evidence_fingerprint}."
+            if signal.evidence_fingerprint
+            else ""
+        )
+
         def assess() -> dict:
             result = gl.nondet.exec_prompt(
                 f"""Act as an environmental sensor integrity panel. Determine whether this reading is normal, requires watch, establishes an incident, or indicates sensor quarantine.
-STATION {station.name}, {station.region}. SENSOR {sensor.metric} {sensor.unit}; baseline {sensor.baseline}; trust {sensor.trust}.
-READING {signal.value} at {signal.observed_at}. CONTEXT {signal.context}. EVIDENCE {signal.evidence_url}. CALIBRATION {sensor.calibration_url}.
+STATION {station.name}, {station.region}. SENSOR {sensor.metric} {sensor.unit}; baseline {sensor.baseline}; trust {sensor.trust}. REPORTER {signal.reporter}.
+READING {signal.value} at {signal.observed_at}. CONTEXT {signal.context}. EVIDENCE {signal.evidence_url}. CALIBRATION {sensor.calibration_url}.{fingerprint_instruction}
+{"Verify that the evidence at the URL matches the provided fingerprint. If fingerprint is provided but evidence cannot be verified, note this in your analysis." if signal.evidence_fingerprint else ""}
 Use web context when relevant. Return JSON {{"verdict":"NORMAL"|"WATCH"|"INCIDENT"|"QUARANTINE","severity":0-100,"confidence":0-100,"analysis":"under 500 chars","response":"specific action under 500 chars"}}.""",
                 response_format="json",
             )
@@ -499,16 +542,23 @@ Use web context when relevant. Return JSON {{"verdict":"NORMAL"|"WATCH"|"INCIDEN
         inspection_id: str,
         findings: str,
         evidence_url: str,
+        evidence_fingerprint: str = "",
     ) -> None:
         if inspection_id not in self.inspections:
             raise gl.vm.UserError(f"{EXPECTED} Inspection not found")
         inspection = self.inspections[inspection_id]
         if inspection.status != "ASSIGNED":
             raise gl.vm.UserError(f"{EXPECTED} Inspection not assigned")
+        if gl.message.sender_address != inspection.assignee:
+            raise gl.vm.UserError(
+                f"{EXPECTED} Only assigned inspector can submit findings"
+            )
         self._text(findings, "Findings", 100, 1800)
         self._https(evidence_url)
+        self._fingerprint(evidence_fingerprint, "Evidence")
         inspection.findings = findings
         inspection.evidence_url = evidence_url
+        inspection.evidence_fingerprint = evidence_fingerprint
         inspection.status = "PENDING_REVIEW"
         self.inspections[inspection.id] = inspection
 
@@ -523,9 +573,17 @@ Use web context when relevant. Return JSON {{"verdict":"NORMAL"|"WATCH"|"INCIDEN
         signal = self.signals[incident.signal_id]
         sensor = self.sensors[signal.sensor_id]
 
+        fingerprint_instruction = (
+            f" EVIDENCE FINGERPRINT {inspection.evidence_fingerprint}."
+            if inspection.evidence_fingerprint
+            else ""
+        )
+
         def assess() -> dict:
             result = gl.nondet.exec_prompt(
-                f"""Review an environmental field inspection. INCIDENT {incident.title}. REQUIRED RESPONSE {incident.response}. FINDINGS {inspection.findings}. EVIDENCE {inspection.evidence_url}. Return JSON {{"verdict":"CONFIRMED"|"FALSE_ALARM"|"RECALIBRATE"|"ESCALATE","analysis":"under 500 chars"}}.""",
+                f"""Review an environmental field inspection. INCIDENT {incident.title}. REQUIRED RESPONSE {incident.response}. INSPECTOR {inspection.assignee}. FINDINGS {inspection.findings}. EVIDENCE {inspection.evidence_url}.{fingerprint_instruction}
+{"Verify that the evidence at the URL matches the provided fingerprint. If fingerprint is provided but evidence cannot be verified, note this in your analysis." if inspection.evidence_fingerprint else ""}
+Evaluate whether the findings adequately address the required response. Return JSON {{"verdict":"CONFIRMED"|"FALSE_ALARM"|"RECALIBRATE"|"ESCALATE","analysis":"under 500 chars","response_assessment":"under 200 chars explaining if findings address the required response"}}.""",
                 response_format="json",
             )
             if not isinstance(result, dict):
@@ -536,19 +594,26 @@ Use web context when relevant. Return JSON {{"verdict":"NORMAL"|"WATCH"|"INCIDEN
             return {
                 "verdict": verdict,
                 "analysis": str(result.get("analysis", ""))[:500],
+                "response_assessment": str(result.get("response_assessment", ""))[:200],
             }
 
         def validate(result: gl.vm.Result) -> bool:
             if not isinstance(result, gl.vm.Return) or not isinstance(result.calldata, dict):
                 return False
             try:
-                return result.calldata.get("verdict") == assess()["verdict"]
+                independent = assess()
+                leader = result.calldata
+                return (
+                    leader.get("verdict") == independent["verdict"]
+                    and len(independent.get("response_assessment", "")) >= 20
+                )
             except Exception:
                 return False
 
         decision = gl.vm.run_nondet_unsafe(assess, validate)
         inspection.verdict = decision["verdict"]
         inspection.analysis = decision["analysis"]
+        inspection.response_assessment = decision["response_assessment"]
         inspection.status = "RESOLVED"
         incident.status = (
             "CLOSED"

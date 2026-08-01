@@ -52,6 +52,7 @@ const signalForm = ref({
   context:
     "A sustained anomaly appeared across consecutive intervals with supporting context from nearby activity and neighboring sensor behavior.",
   evidence_url: "https://github.com/AbstrusImad/fieldsignal",
+  evidence_fingerprint: "",
 });
 const inspectionForm = ref({
   plan:
@@ -59,6 +60,7 @@ const inspectionForm = ref({
   findings:
     "Field inspection confirmed the device condition and compared its reading against a traceable reference instrument with timestamped context.",
   evidence_url: "https://github.com/AbstrusImad/fieldsignal",
+  evidence_fingerprint: "",
 });
 
 const currentSensor = computed(
@@ -225,6 +227,7 @@ const submitSignal = () =>
     signalForm.value.observed_at,
     signalForm.value.context,
     signalForm.value.evidence_url,
+    signalForm.value.evidence_fingerprint || "",
   ]);
 const resolveSignal = (id) =>
   transact("Signal correlation", "resolve_signal", [id]);
@@ -238,6 +241,7 @@ const submitInspection = (inspection) =>
     inspection.id,
     inspectionForm.value.findings,
     inspectionForm.value.evidence_url,
+    inspectionForm.value.evidence_fingerprint || "",
   ]);
 const reviewInspection = (id) =>
   transact("Inspection review", "resolve_inspection", [id]);
@@ -571,6 +575,10 @@ onMounted(restore);
             <span>PUBLIC HTTPS EVIDENCE</span>
             <input v-model="signalForm.evidence_url" type="url" required />
           </label>
+          <label class="long-line">
+            <span>EVIDENCE FINGERPRINT / OPTIONAL SHA-256 HEX</span>
+            <input v-model="signalForm.evidence_fingerprint" type="text" pattern="[0-9a-fA-F]{0}|[0-9a-fA-F]{64}" placeholder="Leave empty or paste 64-char hex hash" />
+          </label>
           <button class="guarded-lever" type="submit">
             <i><Satellite /></i><span>PULL TO TRANSMIT</span><b></b>
           </button>
@@ -583,6 +591,10 @@ onMounted(restore);
           <label class="long-line">
             <span>PUBLIC HTTPS EVIDENCE</span>
             <input v-model="inspectionForm.evidence_url" type="url" required />
+          </label>
+          <label class="long-line">
+            <span>EVIDENCE FINGERPRINT / OPTIONAL SHA-256 HEX</span>
+            <input v-model="inspectionForm.evidence_fingerprint" type="text" pattern="[0-9a-fA-F]{0}|[0-9a-fA-F]{64}" placeholder="Leave empty or paste 64-char hex hash" />
           </label>
           <button class="guarded-lever" type="submit">
             <i><FileCheck2 /></i><span>PULL TO FILE</span><b></b>

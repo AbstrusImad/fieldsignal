@@ -4,7 +4,7 @@ import { ExecutionResult, TransactionStatus } from "genlayer-js/types";
 
 export const contractAddress =
   import.meta.env.VITE_CONTRACT_ADDRESS ||
-  "0x42a6982fA6bAD35b3FE4A0E21c162a07195D18Cb";
+  "0x8e179eF08D98a16b145b6229cD0C824035cc3287";
 export const explorerUrl =
   import.meta.env.VITE_EXPLORER_URL ||
   "https://explorer-bradbury.genlayer.com";

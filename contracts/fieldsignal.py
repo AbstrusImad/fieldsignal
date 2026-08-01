@@ -195,7 +195,8 @@ class FieldSignal(gl.Contract):
                 f"{EXPECTED} Only station operator can perform this action"
             )
 
-    def _fingerprint(self, value: str, label: str):
+    def _fingerprint(self, value, label: str):
+        value = str(value) if value is not None else ""
         if len(value) > 0 and (len(value) < 64 or len(value) > 128):
             raise gl.vm.UserError(
                 f"{EXPECTED} {label} fingerprint must be 64-128 characters (SHA-256 hex)"
@@ -527,7 +528,9 @@ Use web context when relevant. Return JSON {{"verdict":"NORMAL"|"WATCH"|"INCIDEN
             plan,
             "",
             "",
+            "",
             "ASSIGNED",
+            "",
             "",
             "",
         )

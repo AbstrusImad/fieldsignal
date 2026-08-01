@@ -1,0 +1,13 @@
+{
+  "network": "testnet-bradbury",
+  "chainId": 4221,
+  "contractAddress": "0x13856a9658BaDc8CfE25c098579Cd9BB21b9b7C9",
+  "transactionHash": "0x1d19d2028b9b208fc44b2986b54f22ba9a9a6e42acdcef6039c6bbf1ebeccc1a",
+  "deployer": "0x95803126315A05E642D8E46CE1d77eA2199a2A6E",
+  "publisher": "AbstrusImad",
+  "explorer": "https://explorer-bradbury.genlayer.com",
+  "status": "ACCEPTED",
+  "deployedAt": "2026-08-01T16:12:27.652Z",
+  "migration": false,
+  "genesis": true
+}

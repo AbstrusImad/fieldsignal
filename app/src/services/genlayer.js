@@ -1,14 +1,14 @@
 import { createClient } from "genlayer-js";
-import { testnetBradbury } from "genlayer-js/chains";
+import { studionet } from "genlayer-js/chains";
 import { ExecutionResult, TransactionStatus } from "genlayer-js/types";
 
 export const contractAddress =
   import.meta.env.VITE_CONTRACT_ADDRESS ||
-  "0x8e179eF08D98a16b145b6229cD0C824035cc3287";
+  "0xf10e9A58Ff38ED186e63F84C67A1C1585B0Dfc06";
 export const explorerUrl =
   import.meta.env.VITE_EXPLORER_URL ||
-  "https://explorer-bradbury.genlayer.com";
-export const publicClient = createClient({ chain: testnetBradbury });
+  "https://explorer-studio.genlayer.com";
+export const publicClient = createClient({ chain: studionet });
 
 const stringify = (value) => {
   if (typeof value === "string") return value;
@@ -59,8 +59,8 @@ export async function connectWallet({ silent = false } = {}) {
   });
   const address = accounts?.[0];
   if (!address) return null;
-  const client = createClient({ chain: testnetBradbury, account: address });
-  if (!silent) await client.connect("testnetBradbury");
+  const client = createClient({ chain: studionet, account: address });
+  if (!silent) await client.connect("studionet");
   return { address, client };
 }
 
@@ -131,7 +131,7 @@ export async function writeContract({
 }) {
   if (!client) throw new Error("Connect your wallet first.");
   onStage?.("signature");
-  await client.connect("testnetBradbury");
+  await client.connect("studionet");
   const hash = await retry(() =>
     client.writeContract({ address: contractAddress, functionName, args }),
   );

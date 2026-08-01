@@ -1,19 +1,25 @@
 {
   "network": "testnet-bradbury",
   "chainId": 4221,
-  "contractAddress": "0x8e179eF08D98a16b145b6229cD0C824035cc3287",
-  "transactionHash": "0xcab222a2629c943ce7f93626289b0c92dac0f593c53e5ba306f5d51d7669e9d9",
+  "contractAddress": "0x447722033b4e686552219814848b76B7c9418A3c",
+  "transactionHash": "0x5e2000a0d40b5071d7d709df907e20c805d8879a51f80af9cf14b9a28506c99e",
   "deployer": "0x95803126315A05E642D8E46CE1d77eA2199a2A6E",
   "publisher": "AbstrusImad",
   "explorer": "https://explorer-bradbury.genlayer.com",
   "status": "ACCEPTED",
   "executionResult": "FINISHED_WITH_RETURN",
-  "deployedAt": "2026-08-01T15:29:36.219Z",
+  "deployedAt": "2026-08-01T16:08:40.950Z",
   "contractSha256": "35b59b41032b876a62cf86160694405e2118d62f3178aabea1ffffd76e9ce354",
   "migration": {
     "sourceNetwork": "StudioNet",
     "sourceContract": "0x66127559067cB46dA87E974fb598ba0a44fBA75C",
     "sourceVerifiedAt": "2026-07-31T01:32:03.387Z",
-    "acceptedSourceTransactions": 8
+    "acceptedSourceTransactions": 8,
+    "transactionHash": "0xa9ed0009595ad58dacbed5ac3109cf671c062600d4b54d0a48a73db46c2ee872",
+    "snapshotHash": "e4ac9c7255e9773df4929b7bacebdb6ea086430af2959f3c16753fd87db2f28f",
+    "migratedRecords": 22,
+    "status": "ACCEPTED",
+    "executionResult": "FINISHED_WITH_RETURN",
+    "importedAt": "2026-08-01T16:10:59.386Z"
   }
 }

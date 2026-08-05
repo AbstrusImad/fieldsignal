@@ -20,7 +20,7 @@ for (const viewport of [
   const result = await page.evaluate(() => ({
     title: document.title,
     heading: document.querySelector("h1")?.innerText || "",
-    network: document.body.innerText.includes("BRADBURY"),
+    network: document.body.innerText.includes("STUDIONET"),
     walletControl: document.body.innerText.includes("WITH WALLET"),
     horizontalOverflow:
       document.documentElement.scrollWidth > document.documentElement.clientWidth,

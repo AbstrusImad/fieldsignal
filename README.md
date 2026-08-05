@@ -2,7 +2,7 @@
 
 **Authenticated environmental observations, validator-retrieved evidence, and accountable field response on GenLayer StudioNet.**
 
-[Live application](https://abstrusimad.github.io/fieldsignal/) | [StudioNet deployment](./deployments/studionet.json) | [Contract source](./contracts/fieldsignal.py)
+[Live application](https://abstrusimad.github.io/fieldsignal/) | [StudioNet contract](https://explorer-studio.genlayer.com/address/0x62a1532a70d696199BbDC8C4C2c45b338090A38a) | [Deployment transaction](https://explorer-studio.genlayer.com/tx/0x5a6ce08d3010d95472dcb19cfcd75cf093fe581f1b7c4b9e2e6dbf56e746bb8e) | [Contract source](./contracts/fieldsignal.py)
 
 FieldSignal is a public operational protocol for turning physical sensor readings into evidence-bound incidents. It does not ask validators to judge an unverified URL or accept an arbitrary wallet as a field operator. Every reading is tied to an authorized on-chain operator, every inspection is assigned to a registered inspector, and every consensus run retrieves the linked HTTPS evidence from inside the intelligent contract before changing durable state.
 
@@ -105,7 +105,8 @@ The contract converts the agreed code into canonical text. This prevents an unch
 | --- | --- |
 | Network | GenLayer StudioNet |
 | Chain ID | `61999` |
-| Contract | Updated after deployment in `deployments/studionet.json` |
+| Contract | `0x62a1532a70d696199BbDC8C4C2c45b338090A38a` |
+| Deployment transaction | `0x5a6ce08d3010d95472dcb19cfcd75cf093fe581f1b7c4b9e2e6dbf56e746bb8e` |
 | Deployer | Account 0, `0x95803126315A05E642D8E46CE1d77eA2199a2A6E` |
 | Explorer | `https://explorer-studio.genlayer.com` |
 

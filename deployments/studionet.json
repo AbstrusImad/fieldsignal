@@ -1,9 +1,90 @@
 {
   "network": "studionet",
   "chainId": 61999,
-  "contractAddress": "0x66127559067cB46dA87E974fb598ba0a44fBA75C",
-  "transactionHash": "0xf9b20fdbba84dbf783c4b396c14ebfd5636ab113f7fb866eb7ef7ee26728381c",
+  "contract": "FieldSignal",
+  "contractAddress": "0x62a1532a70d696199BbDC8C4C2c45b338090A38a",
+  "transactionHash": "0x5a6ce08d3010d95472dcb19cfcd75cf093fe581f1b7c4b9e2e6dbf56e746bb8e",
   "deployer": "0x95803126315A05E642D8E46CE1d77eA2199a2A6E",
+  "publisher": "AbstrusImad",
   "explorer": "https://explorer-studio.genlayer.com",
-  "deployedAt": "2026-07-29T05:26:37.406Z"
+  "status": "ACCEPTED",
+  "executionResult": "FINISHED_WITH_RETURN",
+  "deployedAt": "2026-08-05T16:34:28.167Z",
+  "contractSha256": "2bb8d59ff52b75258cafdca93102ae9374dd52750bd7bc0becfe1b858d4bfbf7",
+  "reviewRemediation": {
+    "authenticatedOperators": true,
+    "contractEvidenceRetrieval": true,
+    "recordedInspectorRole": true,
+    "requiredResponseConsensus": true
+  },
+  "seed": {
+    "transactions": {
+      "signal-pm25": {
+        "hash": "0x283a4e1d3b08790d3ecb3376e883925fc5863423dc50ba9e5efa512f8c557f51",
+        "functionName": "submit_signal",
+        "status": "ACCEPTED",
+        "submittedAt": "2026-08-05T16:34:35.945Z",
+        "acceptedAt": "2026-08-05T16:34:42.281Z"
+      },
+      "resolve-pm25": {
+        "hash": "0x4859ee356cae4645aab270f399b8a93adcbe63e815fdc2a7b92cec5631e0cd2a",
+        "functionName": "resolve_signal",
+        "status": "ACCEPTED",
+        "submittedAt": "2026-08-05T16:34:42.949Z",
+        "acceptedAt": "2026-08-05T16:35:01.705Z"
+      },
+      "signal-soil": {
+        "hash": "0xdcc3737297d6dc088ffda942adadf53178fa901b9b18a2aec8cc86d24cbeced3",
+        "functionName": "submit_signal",
+        "status": "ACCEPTED",
+        "submittedAt": "2026-08-05T16:35:02.394Z",
+        "acceptedAt": "2026-08-05T16:35:11.861Z"
+      },
+      "resolve-soil": {
+        "hash": "0x03eaa9d58319a4ea99bd3f5d961bc6f579e0ae80fad746ef22c324d736bba8aa",
+        "functionName": "resolve_signal",
+        "status": "ACCEPTED",
+        "submittedAt": "2026-08-05T16:35:12.452Z",
+        "acceptedAt": "2026-08-05T16:35:53.017Z"
+      },
+      "signal-wind": {
+        "hash": "0xf59357884e32d58677cc568ace5849959fb56437565cb6955a210699366206f3",
+        "functionName": "submit_signal",
+        "status": "ACCEPTED",
+        "submittedAt": "2026-08-05T16:35:53.656Z",
+        "acceptedAt": "2026-08-05T16:36:03.089Z"
+      },
+      "resolve-wind": {
+        "hash": "0xfc21d89189d13da9e6842f4e2b943f9e8eac0665582996c7aea0310aba34f3b6",
+        "functionName": "resolve_signal",
+        "status": "ACCEPTED",
+        "submittedAt": "2026-08-05T16:36:03.639Z",
+        "acceptedAt": "2026-08-05T16:36:31.770Z"
+      },
+      "assign-pm25": {
+        "hash": "0x6c4182cfecc3ef293f6c295a55ebfb00fc6c64228a7d29d68892d365e86883b0",
+        "functionName": "assign_inspection",
+        "status": "ACCEPTED",
+        "submittedAt": "2026-08-05T16:36:33.611Z",
+        "acceptedAt": "2026-08-05T16:36:46.157Z"
+      },
+      "inspect-pm25": {
+        "hash": "0x6de418bff69bac2658fb9afa50362b226ebc9a47100325e1c58d40b25989f1f2",
+        "functionName": "submit_inspection",
+        "status": "ACCEPTED",
+        "submittedAt": "2026-08-05T16:36:46.955Z",
+        "acceptedAt": "2026-08-05T16:36:56.378Z"
+      },
+      "resolve-inspection-pm25": {
+        "hash": "0xddb4785e78e3a1a306282d8ff59a53f9df9e65b1300fcb81a137fcddffc4756b",
+        "functionName": "resolve_inspection",
+        "status": "ACCEPTED",
+        "submittedAt": "2026-08-05T16:36:57.060Z",
+        "acceptedAt": "2026-08-05T16:37:18.939Z"
+      }
+    },
+    "status": "ACCEPTED",
+    "transactionCount": 9,
+    "completedAt": "2026-08-05T16:37:18.941Z"
+  }
 }

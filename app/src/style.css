@@ -938,6 +938,7 @@ svg { width: 18px; height: 18px; stroke-width: 1.8; }
 }
 
 .evidence-tape a { display: inline-flex; align-items: center; gap: 5px; }
+.evidence-tape small { display: block; margin-top: 4px; font-size: 6px; color: #315e59; }
 .evidence-tape svg { width: 11px; height: 11px; }
 
 .verdict-stamp {
@@ -1086,6 +1087,8 @@ svg { width: 18px; height: 18px; stroke-width: 1.8; }
 
 .evidence-label { display: inline-flex; align-items: center; gap: 6px; padding: 7px 11px; border: 2px solid #477e78; color: #356e69; font-size: 8px; font-weight: 600; transform: rotate(.5deg); }
 .evidence-label svg { width: 11px; height: 11px; }
+.response-check { margin-top: 12px; border-color: #477e78; }
+.push-control:disabled { cursor: not-allowed; filter: grayscale(1); opacity: .48; }
 
 .pull-action {
   position: absolute;

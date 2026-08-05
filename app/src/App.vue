@@ -45,20 +45,23 @@ const sensors = ref([]);
 const signals = ref([]);
 const incidents = ref([]);
 const inspections = ref([]);
+const roles = ref({ operator: false, inspector: false, owner: false });
 
 const signalForm = ref({
   value: "42 ug/m3",
   observed_at: new Date().toISOString(),
   context:
     "A sustained anomaly appeared across consecutive intervals with supporting context from nearby activity and neighboring sensor behavior.",
-  evidence_url: "https://github.com/AbstrusImad/fieldsignal",
+  evidence_url:
+    "https://raw.githubusercontent.com/AbstrusImad/fieldsignal/main/docs/evidence/signal-pm25.md",
 });
 const inspectionForm = ref({
   plan:
     "Verify physical condition and calibration, collect a co-located reference sample, document nearby activity, and publish time-aligned evidence.",
   findings:
     "Field inspection confirmed the device condition and compared its reading against a traceable reference instrument with timestamped context.",
-  evidence_url: "https://github.com/AbstrusImad/fieldsignal",
+  evidence_url:
+    "https://raw.githubusercontent.com/AbstrusImad/fieldsignal/main/docs/evidence/inspection-pm25.md",
 });
 
 const currentSensor = computed(
@@ -187,6 +190,9 @@ async function load({ quiet = false } = {}) {
       incidents.value,
       inspections.value,
     ] = values;
+    roles.value = wallet.value
+      ? await readContract("get_roles", [wallet.value])
+      : { operator: false, inspector: false, owner: false };
     selectedSensor.value ||= sensors.value[0]?.id || "";
     selectedSignal.value ||= signals.value[0]?.id || "";
     selectedResponse.value ||= responseFiles.value[0]?.id || "";
@@ -231,6 +237,7 @@ const resolveSignal = (id) =>
 const assignInspection = (incident) =>
   transact("Inspection dispatch", "assign_inspection", [
     incident.id,
+    wallet.value,
     inspectionForm.value.plan,
   ]);
 const submitInspection = (inspection) =>
@@ -259,7 +266,7 @@ onMounted(restore);
       <div class="case-brand">
         <small>ENVIRONMENTAL EVIDENCE KIT</small>
         <h1>FIELD<br />SIGNAL</h1>
-        <p>BRADBURY / UNIT FS-06</p>
+        <p>STUDIONET / UNIT FS-06</p>
       </div>
       <div class="condition-dial">
         <span>FIELD STATE</span>
@@ -394,7 +401,7 @@ onMounted(restore);
                 </p>
               </div>
 
-              <button class="push-control" @click="openReading">
+              <button class="push-control" :disabled="!roles.operator" @click="openReading">
                 <span><Activity /></span>
                 <b>LOG READING</b>
                 <small>press to prepare field sheet</small>
@@ -438,10 +445,11 @@ onMounted(restore);
                 <p>{{ currentSignal.analysis || currentSignal.context }}</p>
               </div>
               <div class="evidence-tape">
-                <span>EVIDENCE</span>
+                <span>{{ currentSignal.evidence_verified ? "EVIDENCE VERIFIED" : "EVIDENCE" }}</span>
                 <a :href="currentSignal.evidence_url" target="_blank">
                   public source <ExternalLink />
                 </a>
+                <small v-if="currentSignal.evidence_digest">SHA256 {{ short(currentSignal.evidence_digest) }}</small>
               </div>
               <div class="verdict-stamp" :class="currentSignal.status.toLowerCase()">
                 <b>{{ currentSignal.verdict || currentSignal.status }}</b>
@@ -484,8 +492,12 @@ onMounted(restore);
                   <i><u :style="{ width: `${currentResponse.severity}%` }"></u></i>
                 </div>
                 <div class="hand-note">
-                  <span>Required field response</span>
+                  <span>Required field response / {{ currentResponse.response_code }}</span>
                   <p>{{ currentResponse.response }}</p>
+                </div>
+                <div v-if="currentResponse.response_assessment" class="hand-note response-check">
+                  <span>{{ currentResponse.required_response_met ? "RESPONSE VERIFIED" : "RESPONSE STILL REQUIRED" }}</span>
+                  <p>{{ currentResponse.response_assessment }}</p>
                 </div>
                 <div class="route-thread">
                   <i class="done"></i><span>Signal {{ currentResponse.signal_id }}</span>
@@ -494,7 +506,7 @@ onMounted(restore);
                   <span>{{ currentResponse.inspection_id || "Inspection unassigned" }}</span>
                 </div>
                 <button
-                  v-if="!currentResponse.inspection_id"
+                  v-if="!currentResponse.inspection_id && roles.operator && roles.inspector"
                   class="pull-action"
                   @click="assignInspection(currentResponse)"
                 >
@@ -509,8 +521,8 @@ onMounted(restore);
                   <span>ASSIGNED TO</span><b>{{ short(currentResponse.assignee) }}</b>
                 </div>
                 <div class="hand-note">
-                  <span>{{ currentResponse.findings ? "Published findings" : "Field plan" }}</span>
-                  <p>{{ currentResponse.analysis || currentResponse.findings || currentResponse.plan }}</p>
+                  <span>{{ currentResponse.response_assessment ? "Required response assessment" : currentResponse.findings ? "Published findings" : "Field plan" }}</span>
+                  <p>{{ currentResponse.response_assessment || currentResponse.analysis || currentResponse.findings || currentResponse.plan }}</p>
                 </div>
                 <a
                   v-if="currentResponse.evidence_url"
@@ -518,10 +530,10 @@ onMounted(restore);
                   :href="currentResponse.evidence_url"
                   target="_blank"
                 >
-                  EVIDENCE ATTACHED <ExternalLink />
+                  {{ currentResponse.evidence_verified ? "EVIDENCE VERIFIED" : "EVIDENCE ATTACHED" }} <ExternalLink />
                 </a>
                 <button
-                  v-if="currentResponse.status === 'ASSIGNED'"
+                  v-if="currentResponse.status === 'ASSIGNED' && roles.inspector && currentResponse.assignee?.toLowerCase() === wallet?.toLowerCase()"
                   class="pull-action"
                   @click="openInspection(currentResponse)"
                 >
@@ -542,7 +554,7 @@ onMounted(restore);
         </div>
 
         <div class="tray-counter">
-          <span><i></i> BRADBURY</span>
+          <span><i></i> STUDIONET</span>
           <b>{{ overview.stations || 0 }}</b><small>stations</small>
           <b>{{ overview.sensors || 0 }}</b><small>sensors</small>
           <b>{{ overview.open_incidents || 0 }}</b><small>open</small>

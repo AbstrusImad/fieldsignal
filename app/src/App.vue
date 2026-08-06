@@ -3,7 +3,6 @@ import { computed, onMounted, ref } from "vue";
 import {
   Activity,
   AlertTriangle,
-  BookOpenCheck,
   Check,
   CircleHelp,
   CircleDot,
@@ -18,6 +17,8 @@ import {
   Sparkles,
   X,
 } from "lucide-vue-next";
+import GuidePage from "./components/GuidePage.vue";
+import SectionLoader from "./components/SectionLoader.vue";
 import {
   connectWallet,
   contractAddress,
@@ -28,6 +29,9 @@ import {
 } from "./services/genlayer";
 
 const STORAGE_KEY = "fieldsignal:wallet-connected";
+const isGuidePage = window.location.pathname.replace(/\/+$/, "").endsWith("/guide");
+const appUrl = import.meta.env.BASE_URL;
+const guideUrl = `${import.meta.env.BASE_URL}guide/`;
 const ready = ref(false);
 const wallet = ref(null);
 const client = ref(null);
@@ -39,8 +43,8 @@ const selectedSensor = ref("SEN-001");
 const selectedSignal = ref("");
 const selectedResponse = ref("");
 const sheet = ref(null);
-const guideOpen = ref(false);
 const tx = ref({ open: false, stage: "", title: "", hash: "", error: "", status: "" });
+const sectionLoading = ref({ survey: false, traces: false, response: false });
 
 const overview = ref({});
 const stations = ref([]);
@@ -95,6 +99,7 @@ const txIndex = computed(() => {
   if (["accepted", "failed"].includes(tx.value.stage)) return 3;
   return 0;
 });
+const isSectionLoading = computed(() => sectionLoading.value[section.value]);
 const gaugeAngle = computed(() => {
   const trust = Number(currentSensor.value?.trust || 0);
   return -118 + (trust / 100) * 236;
@@ -109,9 +114,10 @@ function sensorFor(id) {
 function stationFor(id) {
   return stations.value.find((item) => item.id === id);
 }
-function switchSection(next) {
+async function switchSection(next) {
   section.value = next;
   sheet.value = null;
+  await loadSection(next);
 }
 function pickSensor(id) {
   selectedSensor.value = id;
@@ -172,6 +178,7 @@ function logout() {
 }
 async function load({ quiet = false } = {}) {
   loading.value = true;
+  sectionLoading.value = { survey: true, traces: true, response: true };
   if (!quiet) error.value = "";
   try {
     const values = [];
@@ -203,6 +210,57 @@ async function load({ quiet = false } = {}) {
     if (!quiet) error.value = formatError(cause);
   } finally {
     loading.value = false;
+    sectionLoading.value = { survey: false, traces: false, response: false };
+  }
+}
+
+async function loadSection(target, { quiet = false } = {}) {
+  sectionLoading.value[target] = true;
+  loading.value = true;
+  if (!quiet) error.value = "";
+  try {
+    if (target === "survey") {
+      const [nextOverview, nextStations, nextSensors, nextRoles] = await Promise.all([
+        readContract("get_overview"),
+        readContract("get_stations"),
+        readContract("get_sensors"),
+        wallet.value ? readContract("get_roles", [wallet.value]) : Promise.resolve(roles.value),
+      ]);
+      overview.value = nextOverview;
+      stations.value = nextStations;
+      sensors.value = nextSensors;
+      roles.value = nextRoles;
+      selectedSensor.value ||= sensors.value[0]?.id || "";
+    } else if (target === "traces") {
+      const [nextOverview, nextStations, nextSensors, nextSignals] = await Promise.all([
+        readContract("get_overview"),
+        readContract("get_stations"),
+        readContract("get_sensors"),
+        readContract("get_signals"),
+      ]);
+      overview.value = nextOverview;
+      stations.value = nextStations;
+      sensors.value = nextSensors;
+      signals.value = nextSignals;
+      selectedSignal.value ||= signals.value[0]?.id || "";
+    } else {
+      const [nextOverview, nextIncidents, nextInspections, nextRoles] = await Promise.all([
+        readContract("get_overview"),
+        readContract("get_incidents"),
+        readContract("get_inspections"),
+        wallet.value ? readContract("get_roles", [wallet.value]) : Promise.resolve(roles.value),
+      ]);
+      overview.value = nextOverview;
+      incidents.value = nextIncidents;
+      inspections.value = nextInspections;
+      roles.value = nextRoles;
+      selectedResponse.value ||= responseFiles.value[0]?.id || "";
+    }
+  } catch (cause) {
+    if (!quiet) error.value = formatError(cause);
+  } finally {
+    sectionLoading.value[target] = false;
+    loading.value = Object.values(sectionLoading.value).some(Boolean);
   }
 }
 async function transact(title, functionName, args) {
@@ -255,11 +313,21 @@ const submitInspection = (inspection) =>
 const reviewInspection = (id) =>
   transact("Inspection review", "resolve_inspection", [id]);
 
-onMounted(restore);
+onMounted(() => {
+  if (isGuidePage) ready.value = true;
+  else restore();
+});
 </script>
 
 <template>
-  <div v-if="!ready" class="packing-screen">
+  <GuidePage
+    v-if="isGuidePage"
+    :app-url="appUrl"
+    :contract-address="contractAddress"
+    :explorer-url="explorerUrl"
+  />
+
+  <div v-else-if="!ready" class="packing-screen">
     <div class="packing-case"><i></i><b>FIELD SIGNAL</b><span>Preparing field kit</span></div>
   </div>
 
@@ -287,9 +355,9 @@ onMounted(restore);
         <MapPin />
         <span>CORRELATE<br />BEFORE ACTION</span>
       </div>
-      <button class="field-guide-trigger landing-guide" @click="guideOpen = true">
+      <a class="field-guide-trigger landing-guide" :href="guideUrl">
         <CircleHelp /><span>FIELD GUIDE</span>
-      </button>
+      </a>
       <button class="unlock-latch" :disabled="connecting" @click="connect">
         <span class="latch-ring"><i></i></span>
         <b>{{ connecting ? "RELEASING" : "UNLOCK" }}</b>
@@ -325,11 +393,11 @@ onMounted(restore);
         </div>
         <div class="kit-utilities">
           <span class="wallet-tag"><i></i>{{ short(wallet) }}</span>
-          <button title="Open field guide" @click="guideOpen = true"><CircleHelp /></button>
+          <a :href="guideUrl" title="Open detailed field guide"><CircleHelp /></a>
           <a :href="`${explorerUrl}/address/${contractAddress}`" target="_blank" title="Contract">
             <ExternalLink />
           </a>
-          <button :class="{ spinning: loading }" title="Reload field state" @click="load()">
+          <button :class="{ spinning: loading }" title="Reload current blockchain section" @click="loadSection(section)">
             <RefreshCw />
           </button>
           <button title="Pack and disconnect" @click="logout"><LogOut /></button>
@@ -353,7 +421,9 @@ onMounted(restore);
           <i class="folder-back back-one"></i>
           <i class="folder-back back-two"></i>
 
-          <article v-if="section === 'survey' && currentSensor" class="active-file survey-file">
+          <SectionLoader v-if="isSectionLoading" :section="section" />
+
+          <article v-else-if="section === 'survey' && currentSensor" class="active-file survey-file">
             <div class="file-tab"><span>{{ currentSensor.id }}</span></div>
             <div class="sensor-index">
               <button
@@ -641,37 +711,4 @@ onMounted(restore);
     </aside>
   </main>
 
-  <div v-if="guideOpen" class="guide-layer" @click.self="guideOpen = false">
-    <section class="field-guide" role="dialog" aria-modal="true" aria-labelledby="guide-title">
-      <header>
-        <div><BookOpenCheck /><span>FS-06 / OPERATIONS MANUAL</span></div>
-        <button title="Close field guide" @click="guideOpen = false"><X /></button>
-      </header>
-      <div class="guide-heading">
-        <small>REVIEWER QUICK START</small>
-        <h2 id="guide-title">From field reading to verified response</h2>
-        <p>Every writable action is role-gated on-chain. Evidence is retrieved by the contract and independently assessed by GenLayer validators.</p>
-      </div>
-      <ol class="guide-steps">
-        <li><b>01</b><div><strong>Unlock the field kit</strong><span>Connect through the wallet's standard EIP-1193 account request. No MetaMask Snaps method is used.</span></div></li>
-        <li><b>02</b><div><strong>Log an authenticated reading</strong><span>In Survey, select a registered sensor and attach public HTTPS evidence. Only its station operator or an authorized operator can submit.</span></div></li>
-        <li><b>03</b><div><strong>Run evidence consensus</strong><span>Open Traces and correlate the reading. The contract retrieves the URL; validators check the verdict, severity, confidence, digest, and required response.</span></div></li>
-        <li><b>04</b><div><strong>Dispatch the recorded inspector</strong><span>In Response, the station operator assigns an active inspector. The assignment is stored with the incident.</span></div></li>
-        <li><b>05</b><div><strong>File and verify findings</strong><span>Only that recorded inspector may submit findings. Consensus retrieves the inspection evidence and records whether the incident's required response was met.</span></div></li>
-      </ol>
-      <div class="guide-roles">
-        <span><i>O</i><b>OWNER</b> manages roles</span>
-        <span><i>OP</i><b>OPERATOR</b> readings and dispatch</span>
-        <span><i>IN</i><b>INSPECTOR</b> assigned findings</span>
-      </div>
-      <aside>
-        <AlertTriangle />
-        <p><b>Seeded reviewer account:</b> the deployment wallet is registered as owner, operator, and inspector. Other wallets can inspect live records but need an on-chain role before using protected actions.</p>
-      </aside>
-      <footer>
-        <a :href="`${explorerUrl}/address/${contractAddress}`" target="_blank">LIVE CONTRACT <ExternalLink /></a>
-        <a href="https://raw.githubusercontent.com/AbstrusImad/fieldsignal/main/docs/evidence/signal-pm25.md" target="_blank">SAMPLE EVIDENCE <ExternalLink /></a>
-      </footer>
-    </section>
-  </div>
 </template>

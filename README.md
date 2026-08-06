@@ -2,7 +2,7 @@
 
 **Authenticated environmental observations, validator-retrieved evidence, and accountable field response on GenLayer StudioNet.**
 
-[Live application](https://abstrusimad.github.io/fieldsignal/) | [StudioNet contract](https://explorer-studio.genlayer.com/address/0x62a1532a70d696199BbDC8C4C2c45b338090A38a) | [Deployment transaction](https://explorer-studio.genlayer.com/tx/0x5a6ce08d3010d95472dcb19cfcd75cf093fe581f1b7c4b9e2e6dbf56e746bb8e) | [Contract source](./contracts/fieldsignal.py)
+[Live application](https://abstrusimad.github.io/fieldsignal/) | [Detailed operations guide](https://abstrusimad.github.io/fieldsignal/guide/) | [StudioNet contract](https://explorer-studio.genlayer.com/address/0x62a1532a70d696199BbDC8C4C2c45b338090A38a) | [Deployment transaction](https://explorer-studio.genlayer.com/tx/0x5a6ce08d3010d95472dcb19cfcd75cf093fe581f1b7c4b9e2e6dbf56e746bb8e) | [Contract source](./contracts/fieldsignal.py)
 
 FieldSignal is a public operational protocol for turning physical sensor readings into evidence-bound incidents. It does not ask validators to judge an unverified URL or accept an arbitrary wallet as a field operator. Every reading is tied to an authorized on-chain operator, every inspection is assigned to a registered inspector, and every consensus run retrieves the linked HTTPS evidence from inside the intelligent contract before changing durable state.
 
@@ -24,7 +24,7 @@ FieldSignal combines those questions into one auditable lifecycle:
 
 ## How To Use The Live App
 
-The **Field Guide** button on the closed case is available before wallet connection and remains accessible from the help control inside the open kit.
+The **Field Guide** button on the closed case and the help control inside the open kit open a dedicated, directly addressable [operations manual](https://abstrusimad.github.io/fieldsignal/guide/). Its eight chapters cover prerequisites, EIP-1193 wallet entry, readings, consensus, incidents, inspections, roles, receipts, and expected contract rejections.
 
 1. Open the [live application](https://abstrusimad.github.io/fieldsignal/) and select **Unlock with wallet**. FieldSignal requests accounts through standard EIP-1193 `eth_requestAccounts`; it does not invoke MetaMask Snaps.
 2. In **Survey**, choose a registered sensor, open **Log reading**, and submit a timestamped observation with a public HTTPS evidence URL. The included [PM2.5 evidence record](https://raw.githubusercontent.com/AbstrusImad/fieldsignal/main/docs/evidence/signal-pm25.md) can be used for review.

@@ -1,5 +1,5 @@
 {
-  "verifiedAt": "2026-08-05T16:37:26.642Z",
+  "verifiedAt": "2026-08-06T12:12:49.988Z",
   "network": "StudioNet",
   "contractAddress": "0x62a1532a70d696199BbDC8C4C2c45b338090A38a",
   "overview": {
@@ -9,15 +9,15 @@
     "inspectors": 1,
     "open_incidents": 1,
     "operators": 1,
-    "pending_signals": 0,
+    "pending_signals": 1,
     "sensors": 8,
-    "signals": 3,
+    "signals": 4,
     "stations": 6
   },
   "counts": {
     "stations": 6,
     "sensors": 8,
-    "signals": 3,
+    "signals": 4,
     "incidents": 2,
     "inspections": 1
   },

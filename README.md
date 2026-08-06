@@ -22,6 +22,20 @@ FieldSignal combines those questions into one auditable lifecycle:
 8. Validators retrieve the inspection evidence and decide whether every required action is proven.
 9. The incident closes only when verified evidence supports the response completion.
 
+## How To Use The Live App
+
+The **Field Guide** button on the closed case is available before wallet connection and remains accessible from the help control inside the open kit.
+
+1. Open the [live application](https://abstrusimad.github.io/fieldsignal/) and select **Unlock with wallet**. FieldSignal requests accounts through standard EIP-1193 `eth_requestAccounts`; it does not invoke MetaMask Snaps.
+2. In **Survey**, choose a registered sensor, open **Log reading**, and submit a timestamped observation with a public HTTPS evidence URL. The included [PM2.5 evidence record](https://raw.githubusercontent.com/AbstrusImad/fieldsignal/main/docs/evidence/signal-pm25.md) can be used for review.
+3. Move to **Traces**, select the new signal, and run consensus. Keep the execution receipt open while validators retrieve the linked source and agree on its digest, verdict, severity, confidence, and required response code.
+4. If consensus opens an incident, enter **Response** and assign it to a registered inspector. The station operator cannot substitute an arbitrary wallet for that role.
+5. Using the recorded inspector account, file findings with public inspection evidence. The included [inspection record](https://raw.githubusercontent.com/AbstrusImad/fieldsignal/main/docs/evidence/inspection-pm25.md) demonstrates the expected structure.
+6. Run the inspection review. Validators retrieve the evidence again and check the incident's exact required response. The incident closes only when `required_response_met` is true.
+7. Follow **Trace** on the animated receipt to inspect the terminal StudioNet transaction result.
+
+The seeded deployment account (`0x95803126315A05E642D8E46CE1d77eA2199a2A6E`) holds owner, operator, and inspector roles so reviewers can exercise the complete lifecycle with that wallet. Any other wallet can read the live files but cannot perform protected actions until the owner grants the corresponding on-chain role.
+
 ## Review Remediation
 
 This release directly addresses the requested GenLayer review controls.

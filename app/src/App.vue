@@ -3,7 +3,9 @@ import { computed, onMounted, ref } from "vue";
 import {
   Activity,
   AlertTriangle,
+  BookOpenCheck,
   Check,
+  CircleHelp,
   CircleDot,
   ExternalLink,
   FileCheck2,
@@ -37,7 +39,8 @@ const selectedSensor = ref("SEN-001");
 const selectedSignal = ref("");
 const selectedResponse = ref("");
 const sheet = ref(null);
-const tx = ref({ open: false, stage: "", title: "", hash: "", error: "" });
+const guideOpen = ref(false);
+const tx = ref({ open: false, stage: "", title: "", hash: "", error: "", status: "" });
 
 const overview = ref({});
 const stations = ref([]);
@@ -89,7 +92,7 @@ const currentResponse = computed(
 const txIndex = computed(() => {
   if (tx.value.stage === "signature") return 1;
   if (["submitted", "consensus"].includes(tx.value.stage)) return 2;
-  if (tx.value.stage === "accepted") return 3;
+  if (["accepted", "failed"].includes(tx.value.stage)) return 3;
   return 0;
 });
 const gaugeAngle = computed(() => {
@@ -204,22 +207,25 @@ async function load({ quiet = false } = {}) {
 }
 async function transact(title, functionName, args) {
   sheet.value = null;
-  tx.value = { open: true, stage: "signature", title, hash: "", error: "" };
+  tx.value = { open: true, stage: "signature", title, hash: "", error: "", status: "" };
   try {
     const result = await writeContract({
       client: client.value,
       functionName,
       args,
-      onStage: (stage, hash) => {
+      onStage: (stage, hash, status) => {
         tx.value.stage = stage;
         if (hash) tx.value.hash = hash;
+        if (status) tx.value.status = status;
       },
     });
     tx.value.hash = result.hash;
+    tx.value.status = result.receipt?.statusName || "ACCEPTED";
     await load();
   } catch (cause) {
     if (cause?.hash) tx.value.hash = cause.hash;
     tx.value.stage = "failed";
+    tx.value.status = cause?.receipt?.statusName || "ROLLBACK";
     tx.value.error = formatError(cause);
   }
 }
@@ -281,6 +287,9 @@ onMounted(restore);
         <MapPin />
         <span>CORRELATE<br />BEFORE ACTION</span>
       </div>
+      <button class="field-guide-trigger landing-guide" @click="guideOpen = true">
+        <CircleHelp /><span>FIELD GUIDE</span>
+      </button>
       <button class="unlock-latch" :disabled="connecting" @click="connect">
         <span class="latch-ring"><i></i></span>
         <b>{{ connecting ? "RELEASING" : "UNLOCK" }}</b>
@@ -306,7 +315,7 @@ onMounted(restore);
       <div class="kit-lid">
         <div class="lid-pocket">
           <span>FIELD SIGNAL</span>
-          <small>Environmental integrity kit / Bradbury</small>
+          <small>Environmental integrity kit / StudioNet</small>
         </div>
         <div class="lid-map">
           <i v-for="n in 6" :key="n" :class="`map-pin pin-${n}`"></i>
@@ -316,6 +325,7 @@ onMounted(restore);
         </div>
         <div class="kit-utilities">
           <span class="wallet-tag"><i></i>{{ short(wallet) }}</span>
+          <button title="Open field guide" @click="guideOpen = true"><CircleHelp /></button>
           <a :href="`${explorerUrl}/address/${contractAddress}`" target="_blank" title="Contract">
             <ExternalLink />
           </a>
@@ -608,16 +618,16 @@ onMounted(restore);
       <div class="printer-mouth"><i></i><i></i><i></i></div>
       <section>
         <button title="Tear off receipt" @click="tx.open = false"><X /></button>
-        <small>GENLAYER / EXECUTION RECEIPT</small>
+        <small>GENLAYER / EXECUTION RECEIPT / {{ tx.status || tx.stage }}</small>
         <h3>{{ tx.title }}</h3>
         <div class="receipt-stage" :class="{ done: txIndex >= 1, failed: tx.stage === 'failed' }">
           <i></i><span>WALLET SIGNATURE</span><b>{{ txIndex >= 1 ? "MARKED" : "WAIT" }}</b>
         </div>
         <div class="receipt-stage" :class="{ done: txIndex >= 2, failed: tx.stage === 'failed' }">
-          <i></i><span>VALIDATOR REVIEW</span><b>{{ txIndex >= 2 ? "RUNNING" : "WAIT" }}</b>
+          <i></i><span>VALIDATOR REVIEW</span><b>{{ tx.stage === "failed" ? "STOPPED" : txIndex >= 3 ? "COMPLETE" : txIndex >= 2 ? "RUNNING" : "WAIT" }}</b>
         </div>
         <div class="receipt-stage" :class="{ done: txIndex >= 3, failed: tx.stage === 'failed' }">
-          <i></i><span>CONTRACT STATE</span><b>{{ txIndex >= 3 ? "ACCEPTED" : "WAIT" }}</b>
+          <i></i><span>CONTRACT STATE</span><b>{{ tx.stage === "failed" ? "ROLLBACK" : txIndex >= 3 ? "ACCEPTED" : "WAIT" }}</b>
         </div>
         <p v-if="tx.stage === 'signature'">Confirm this field action in the connected wallet.</p>
         <p v-else-if="['submitted', 'consensus'].includes(tx.stage)">Validators are correlating the record and its evidence.</p>
@@ -630,4 +640,38 @@ onMounted(restore);
       </section>
     </aside>
   </main>
+
+  <div v-if="guideOpen" class="guide-layer" @click.self="guideOpen = false">
+    <section class="field-guide" role="dialog" aria-modal="true" aria-labelledby="guide-title">
+      <header>
+        <div><BookOpenCheck /><span>FS-06 / OPERATIONS MANUAL</span></div>
+        <button title="Close field guide" @click="guideOpen = false"><X /></button>
+      </header>
+      <div class="guide-heading">
+        <small>REVIEWER QUICK START</small>
+        <h2 id="guide-title">From field reading to verified response</h2>
+        <p>Every writable action is role-gated on-chain. Evidence is retrieved by the contract and independently assessed by GenLayer validators.</p>
+      </div>
+      <ol class="guide-steps">
+        <li><b>01</b><div><strong>Unlock the field kit</strong><span>Connect through the wallet's standard EIP-1193 account request. No MetaMask Snaps method is used.</span></div></li>
+        <li><b>02</b><div><strong>Log an authenticated reading</strong><span>In Survey, select a registered sensor and attach public HTTPS evidence. Only its station operator or an authorized operator can submit.</span></div></li>
+        <li><b>03</b><div><strong>Run evidence consensus</strong><span>Open Traces and correlate the reading. The contract retrieves the URL; validators check the verdict, severity, confidence, digest, and required response.</span></div></li>
+        <li><b>04</b><div><strong>Dispatch the recorded inspector</strong><span>In Response, the station operator assigns an active inspector. The assignment is stored with the incident.</span></div></li>
+        <li><b>05</b><div><strong>File and verify findings</strong><span>Only that recorded inspector may submit findings. Consensus retrieves the inspection evidence and records whether the incident's required response was met.</span></div></li>
+      </ol>
+      <div class="guide-roles">
+        <span><i>O</i><b>OWNER</b> manages roles</span>
+        <span><i>OP</i><b>OPERATOR</b> readings and dispatch</span>
+        <span><i>IN</i><b>INSPECTOR</b> assigned findings</span>
+      </div>
+      <aside>
+        <AlertTriangle />
+        <p><b>Seeded reviewer account:</b> the deployment wallet is registered as owner, operator, and inspector. Other wallets can inspect live records but need an on-chain role before using protected actions.</p>
+      </aside>
+      <footer>
+        <a :href="`${explorerUrl}/address/${contractAddress}`" target="_blank">LIVE CONTRACT <ExternalLink /></a>
+        <a href="https://raw.githubusercontent.com/AbstrusImad/fieldsignal/main/docs/evidence/signal-pm25.md" target="_blank">SAMPLE EVIDENCE <ExternalLink /></a>
+      </footer>
+    </section>
+  </div>
 </template>

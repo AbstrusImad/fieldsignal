@@ -1,6 +1,6 @@
 import { createClient } from "genlayer-js";
 import { studionet } from "genlayer-js/chains";
-import { ExecutionResult, TransactionStatus } from "genlayer-js/types";
+import { ExecutionResult } from "genlayer-js/types";
 
 export const contractAddress =
   import.meta.env.VITE_CONTRACT_ADDRESS ||
@@ -35,7 +35,13 @@ const clean = (value) => {
 
 const busy = (error) => {
   const text = stringify(error?.details || error?.message || error);
-  return text.includes("Server busy") || text.includes("-32028") || text.includes("429");
+  return (
+    text.includes("Server busy") ||
+    text.includes("-32028") ||
+    text.includes("429") ||
+    text.includes("fetch failed") ||
+    text.includes("Failed to fetch")
+  );
 };
 
 async function retry(operation, attempts = 10) {
@@ -101,15 +107,51 @@ function receiptError(receipt) {
     decode(record?.result),
     ...Object.values(record?.eq_outputs || {}).map(decode),
     record?.genvm_result?.error_description,
+    record?.genvm_result?.raw_error,
     record?.genvm_result?.stderr,
+    record?.genvmResult?.errorDescription,
+    record?.genvmResult?.rawError,
     record?.result?.payload?.readable,
+    receipt?.error?.message,
     receipt?.error,
+    receipt?.resultCode,
   ];
   for (const item of candidates) {
     const message = clean(item);
     if (message && message !== "FINISHED_WITH_ERROR") return message;
   }
   return "The contract rejected this action.";
+}
+
+const terminalStatuses = new Set([
+  "ACCEPTED",
+  "UNDETERMINED",
+  "FINALIZED",
+  "CANCELED",
+  "VALIDATORS_TIMEOUT",
+  "LEADER_TIMEOUT",
+]);
+const terminalStatusNumbers = new Set([5, 6, 7, 8, 12, 13]);
+
+async function waitForDecision(hash, onProgress) {
+  for (let attempt = 0; attempt < 180; attempt += 1) {
+    let transaction;
+    try {
+      transaction = await retry(() => publicClient.getTransaction({ hash }), 6);
+    } catch (error) {
+      if (attempt === 179) throw error;
+      await new Promise((done) => setTimeout(done, 3_000));
+      continue;
+    }
+    const statusName = String(transaction?.statusName || "").toUpperCase();
+    const statusNumber = Number(transaction?.status);
+    onProgress?.(statusName || `STATUS_${statusNumber}`);
+    if (terminalStatuses.has(statusName) || terminalStatusNumbers.has(statusNumber)) {
+      return transaction;
+    }
+    await new Promise((done) => setTimeout(done, 3_000));
+  }
+  throw new Error("Timed out while StudioNet was finalizing the transaction.");
 }
 
 export function formatError(error) {
@@ -138,21 +180,20 @@ export async function writeContract({
     client.writeContract({ address: contractAddress, functionName, args }),
   );
   onStage?.("consensus", hash);
-  const receipt = await client.waitForTransactionReceipt({
-    hash,
-    status: TransactionStatus.ACCEPTED,
-    retries: 120,
-    interval: 3_000,
-  });
+  const receipt = await waitForDecision(hash, (status) =>
+    onStage?.("consensus", hash, status),
+  );
   const succeeded =
-    receipt.txExecutionResultName === ExecutionResult.FINISHED_WITH_RETURN ||
-    leader(receipt)?.execution_result === "SUCCESS";
+    receipt?.txExecutionResultName === ExecutionResult.FINISHED_WITH_RETURN ||
+    receipt?.txExecutionResultName === "FINISHED_WITH_RETURN" ||
+    leader(receipt)?.execution_result === "SUCCESS" ||
+    leader(receipt)?.executionResult === "SUCCESS";
   if (!succeeded) {
     const error = new Error(receiptError(receipt));
     error.hash = hash;
     error.receipt = receipt;
     throw error;
   }
-  onStage?.("accepted", hash);
+  onStage?.("accepted", hash, receipt?.statusName || "ACCEPTED");
   return { hash, receipt };
 }

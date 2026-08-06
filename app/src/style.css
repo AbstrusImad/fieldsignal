@@ -295,6 +295,25 @@ svg { width: 18px; height: 18px; stroke-width: 1.8; }
   box-shadow: 2px 3px 0 rgba(0,0,0,.2);
 }
 
+.field-guide-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 13px;
+  border: 2px solid #252b26;
+  border-radius: 3px;
+  color: #f0ecd8;
+  background: #414b40;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 2px #78806f, 3px 4px 0 rgba(0,0,0,.2);
+}
+
+.field-guide-trigger svg { width: 16px; height: 16px; color: var(--cyan); }
+.field-guide-trigger:hover { background: #4b5949; }
+.landing-guide { position: absolute; z-index: 4; top: 8%; right: 24%; }
+
 .unlock-latch {
   position: absolute;
   z-index: 4;
@@ -1368,6 +1387,99 @@ svg { width: 18px; height: 18px; stroke-width: 1.8; }
   background: linear-gradient(135deg, #f1ecd7 5px, transparent 0) 0 0 / 10px 10px repeat-x;
 }
 
+.guide-layer {
+  position: fixed;
+  z-index: 90;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(15, 20, 17, .78);
+  backdrop-filter: blur(6px);
+  animation: guide-fade .2s ease-out;
+}
+
+@keyframes guide-fade { from { opacity: 0; } }
+
+.field-guide {
+  width: min(780px, calc(100vw - 48px));
+  max-height: calc(100svh - 48px);
+  overflow-y: auto;
+  border: 12px solid #252b26;
+  border-radius: 5px;
+  color: #2c3027;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 27px, rgba(62,91,83,.09) 28px, transparent 29px),
+    #f1ecd7;
+  box-shadow: inset 0 0 0 2px #9e967d, 18px 24px 60px rgba(0,0,0,.38);
+  animation: guide-open .35s cubic-bezier(.2,.8,.3,1);
+}
+
+@keyframes guide-open { from { transform: translateY(28px) rotate(-.5deg); opacity: 0; } }
+
+.field-guide > header {
+  position: sticky;
+  z-index: 2;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 54px;
+  padding: 9px 12px 9px 18px;
+  color: #ecedd7;
+  background: #3d4d40;
+  border-bottom: 5px solid var(--orange);
+}
+
+.field-guide > header div { display: flex; align-items: center; gap: 10px; font-size: 12px; font-weight: 700; }
+.field-guide > header svg { color: var(--cyan); }
+.field-guide > header button {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 2px solid #859080;
+  border-radius: 50%;
+  color: white;
+  background: #2d382f;
+  cursor: pointer;
+}
+.field-guide > header button svg { width: 15px; height: 15px; color: white; }
+
+.guide-heading { padding: 28px 32px 20px; border-bottom: 1px dashed #928d78; }
+.guide-heading small { color: #a43e28; font-size: 11px; font-weight: 700; }
+.guide-heading h2 { max-width: 620px; margin: 7px 0 9px; font: 800 36px/1 var(--condensed); }
+.guide-heading p { max-width: 650px; margin: 0; font: 500 15px/1.55 Arial, sans-serif; }
+
+.guide-steps { display: grid; gap: 0; margin: 0; padding: 8px 32px; list-style: none; }
+.guide-steps li { display: grid; grid-template-columns: 46px 1fr; gap: 13px; padding: 16px 0; border-bottom: 1px dashed #aaa38c; }
+.guide-steps li > b {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border: 3px solid #3d594d;
+  border-radius: 50%;
+  color: #3d594d;
+  font-size: 12px;
+}
+.guide-steps li div { display: grid; gap: 4px; }
+.guide-steps strong { font: 800 19px var(--condensed); }
+.guide-steps span { font: 500 14px/1.5 Arial, sans-serif; }
+
+.guide-roles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 18px 32px; }
+.guide-roles span { display: grid; grid-template-columns: 34px 1fr; align-items: center; gap: 2px 8px; padding: 10px; border: 2px solid #8c8b77; font: 500 11px/1.35 Arial, sans-serif; }
+.guide-roles i { grid-row: 1 / 3; width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%; color: white; background: #3d594d; font: normal 700 10px var(--condensed); }
+.guide-roles b { font: 800 13px var(--condensed); }
+
+.field-guide > aside { display: grid; grid-template-columns: 24px 1fr; gap: 11px; margin: 0 32px 20px; padding: 14px; border-left: 6px solid var(--orange); background: #ded7bd; }
+.field-guide > aside svg { width: 20px; height: 20px; color: #9c3b25; }
+.field-guide > aside p { margin: 0; font: 500 13px/1.5 Arial, sans-serif; }
+.field-guide > footer { display: flex; gap: 10px; padding: 16px 32px 24px; }
+.field-guide > footer a { display: inline-flex; align-items: center; gap: 7px; padding: 11px 14px; border: 2px solid #3d594d; color: #2c443a; font-size: 11px; font-weight: 700; text-decoration: none; }
+.field-guide > footer a:first-child { color: white; background: #3d594d; }
+.field-guide > footer svg { width: 13px; height: 13px; }
+
 @media (max-width: 1050px) {
   .case-landing { padding: 30px; }
   .closed-case { width: 92vw; }
@@ -1404,6 +1516,7 @@ svg { width: 18px; height: 18px; stroke-width: 1.8; }
   .case-manifest { top: 43%; right: 7%; display: grid; }
   .case-manifest span { min-width: 68px; }
   .case-sticker { left: 8%; bottom: 6%; }
+  .landing-guide { top: auto; right: 7%; bottom: 31%; }
   .unlock-latch { right: 9%; bottom: 8%; width: 112px; height: 112px; border-width: 9px; }
   .unlock-latch::before { inset: -18px; }
   .unlock-latch b { font-size: 18px; }
@@ -1528,6 +1641,18 @@ svg { width: 18px; height: 18px; stroke-width: 1.8; }
   .guarded-lever { min-width: 230px; margin: 20px 0 0 auto; }
 
   .receipt-reel { left: 10px; width: min(300px, calc(100vw - 20px)); }
+
+  .guide-layer { padding: 8px; align-items: end; }
+  .field-guide { width: 100%; max-height: calc(100svh - 16px); border-width: 8px; }
+  .guide-heading { padding: 22px 18px 16px; }
+  .guide-heading h2 { font-size: 31px; }
+  .guide-heading p { font-size: 14px; }
+  .guide-steps { padding: 6px 18px; }
+  .guide-steps li { grid-template-columns: 40px 1fr; gap: 10px; }
+  .guide-steps li > b { width: 36px; height: 36px; }
+  .guide-roles { grid-template-columns: 1fr; padding: 16px 18px; }
+  .field-guide > aside { margin: 0 18px 16px; }
+  .field-guide > footer { flex-wrap: wrap; padding: 12px 18px 20px; }
 }
 
 @media (max-width: 430px) {
@@ -1537,6 +1662,7 @@ svg { width: 18px; height: 18px; stroke-width: 1.8; }
   .case-manifest { top: 46%; }
   .condition-dial { top: 49%; }
   .case-sticker { display: none; }
+  .landing-guide { right: 8%; bottom: 31%; padding: 8px 10px; }
   .active-file { padding-inline: 13px; }
   .report-heading h2 { font-size: 33px; }
   .report-heading p { max-width: 195px; }

@@ -1178,6 +1178,8 @@ svg { width: 18px; height: 18px; stroke-width: 1.8; }
 .evidence-label svg { width: 11px; height: 11px; }
 .response-check { margin-top: 12px; border-color: #477e78; }
 .push-control:disabled { cursor: not-allowed; filter: grayscale(1); opacity: .48; }
+.push-control.role-required { background: #d2c7a3; }
+.push-control.role-required > span { background: #665b83; box-shadow: inset 0 0 0 3px #8f84ad, 0 5px 0 #423a59; }
 
 .pull-action {
   position: absolute;
@@ -1382,6 +1384,18 @@ svg { width: 18px; height: 18px; stroke-width: 1.8; }
 .clipboard textarea { min-height: 110px; resize: vertical; line-height: 1.45; }
 .clipboard input:focus,
 .clipboard textarea:focus { border-color: var(--orange); }
+
+.role-guard { display: grid; grid-template-columns: 70px minmax(0, 1fr); gap: 18px 22px; align-items: start; padding: 30px 4px 8px; }
+.role-guard > svg { width: 58px; height: 58px; padding: 12px; border: 4px solid #665b83; border-radius: 50%; color: #665b83; }
+.role-guard > div { min-width: 0; }
+.role-guard small { color: #665b83; font-size: 8px; font-weight: 800; }
+.role-guard h3 { margin: 8px 0 14px; font: 800 29px/1.05 var(--condensed); }
+.role-guard p { margin: 9px 0; font: 500 16px/1.55 Arial, sans-serif; }
+.role-guard p b { color: #8e412b; font-family: var(--mono); overflow-wrap: anywhere; }
+.role-guard > button, .role-guard > a { min-height: 46px; display: flex; align-items: center; justify-content: center; gap: 9px; padding: 10px 14px; font: 800 12px Arial, sans-serif; text-decoration: none; }
+.role-guard > button { grid-column: 2; border: 0; color: #f0efdf; background: #665b83; cursor: pointer; }
+.role-guard > a { grid-column: 2; border: 2px solid #5b5d50; color: #42463d; }
+.role-guard > button svg, .role-guard > a svg { width: 17px; }
 
 .guarded-lever {
   grid-column: 1 / -1;
@@ -1659,6 +1673,7 @@ svg { width: 18px; height: 18px; stroke-width: 1.8; }
   .report-layer { padding: 6px; align-items: end; }
   .clipboard { width: 100%; max-height: calc(100svh - 12px); padding: 60px 22px 24px; border-width: 11px; border-radius: 20px 20px 8px 8px; }
   .clipboard form { display: block; }
+  .role-guard { grid-template-columns: 1fr; padding-top: 22px; }.role-guard > svg { width: 48px; height: 48px; }.role-guard > button, .role-guard > a { grid-column: auto; }.role-guard h3 { font-size: 25px; }
   .clipboard label { padding: 10px 2px; }
   .guarded-lever { min-width: 230px; margin: 20px 0 0 auto; }
 

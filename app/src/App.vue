@@ -144,6 +144,14 @@ function pickResponse(id) {
 function openReading() {
   sheet.value = { type: "signal" };
 }
+function handleReading() {
+  if (roles.value.operator) openReading();
+  else sheet.value = { type: "operator-required" };
+}
+async function openAccessFromGuard() {
+  sheet.value = null;
+  await switchSection("access");
+}
 function openInspection(item) {
   sheet.value = { type: "inspection", item };
 }
@@ -522,10 +530,15 @@ onMounted(() => {
                 </p>
               </div>
 
-              <button class="push-control" :disabled="!roles.operator" @click="openReading">
+              <button
+                class="push-control"
+                :class="{ 'role-required': !roles.operator }"
+                :aria-label="roles.operator ? 'Log a sensor reading' : 'Log reading requires an active operator role'"
+                @click="handleReading"
+              >
                 <span><Activity /></span>
-                <b>LOG READING</b>
-                <small>press to prepare field sheet</small>
+                <b>{{ roles.operator ? "LOG READING" : "ROLE REQUIRED" }}</b>
+                <small>{{ roles.operator ? "press to prepare field sheet" : "press for authorization details" }}</small>
               </button>
             </section>
           </article>
@@ -740,10 +753,23 @@ onMounted(() => {
         <button class="clip-close" title="Close report" @click="sheet = null"><X /></button>
         <header>
           <small>FIELD SIGNAL / PUBLIC RECORD</small>
-          <span>{{ sheet.type === "signal" ? currentSensor?.id : sheet.item?.id }}</span>
-          <h2>{{ sheet.type === "signal" ? "Observation sheet" : "Inspection findings" }}</h2>
+          <span>{{ sheet.type === "signal" ? currentSensor?.id : sheet.type === "inspection" ? sheet.item?.id : short(wallet) }}</span>
+          <h2>{{ sheet.type === "signal" ? "Observation sheet" : sheet.type === "inspection" ? "Inspection findings" : "Operator authorization required" }}</h2>
         </header>
-        <form v-if="sheet.type === 'signal'" @submit.prevent="submitSignal">
+        <section v-if="sheet.type === 'operator-required'" class="role-guard" aria-live="polite">
+          <ShieldCheck />
+          <div>
+            <small>ON-CHAIN ACCESS CONTROL</small>
+            <h3>This wallet cannot submit station readings yet.</h3>
+            <p>
+              <b>{{ short(wallet) }}</b> is not an active FieldSignal operator. The contract binds every reading to a recorded station operator or an enabled operator-registry account, so the form remains protected without ignoring your click.
+            </p>
+            <p>The contract owner can authorize this address from the Access file. Public records and the authorization registry remain available to every connected wallet.</p>
+          </div>
+          <button type="button" @click="openAccessFromGuard"><ShieldCheck /> OPEN ACCESS REGISTRY</button>
+          <a :href="guideUrl">READ AUTHORIZATION GUIDE <CircleHelp /></a>
+        </section>
+        <form v-else-if="sheet.type === 'signal'" @submit.prevent="submitSignal">
           <label><span>OBSERVED VALUE</span><input v-model="signalForm.value" required maxlength="40" /></label>
           <label><span>UTC TIMESTAMP</span><input v-model="signalForm.observed_at" required /></label>
           <label class="long-line">

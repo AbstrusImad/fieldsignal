@@ -113,6 +113,7 @@ defineProps({
               That authorization is checked again when consensus starts, so a revoked reporter
               cannot turn a pending reading into incident state.
             </p>
+            <p class="note"><b>If the wallet is not authorized:</b> the control reads <b>Role required</b>. Press it to see the exact reason and open the public Access registry; the owner must authorize that address before the contract will accept a reading.</p>
             <a class="sample-link" href="https://raw.githubusercontent.com/AbstrusImad/fieldsignal/main/docs/evidence/signal-pm25.md" target="_blank">
               OPEN SAMPLE SENSOR EVIDENCE <ExternalLink />
             </a>

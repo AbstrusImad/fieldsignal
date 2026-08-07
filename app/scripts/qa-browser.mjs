@@ -102,5 +102,31 @@ connectedState.accessRegistryVisible = await connected
   .isVisible();
 await connected.screenshot({ path: "C:/tmp/fieldsignal-desktop-access.png" });
 await connected.close();
+
+const unauthorized = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+await unauthorized.addInitScript(() => {
+  localStorage.setItem("fieldsignal:wallet-connected", "true");
+  window.ethereum = {
+    request: async ({ method }) => {
+      if (method === "eth_accounts" || method === "eth_requestAccounts") {
+        return ["0x1111111111111111111111111111111111111111"];
+      }
+      throw new Error(`Unexpected QA wallet method: ${method}`);
+    },
+  };
+});
+await unauthorized.goto(baseUrl, { waitUntil: "domcontentloaded" });
+await unauthorized.locator(".chain-loader").waitFor({ state: "hidden", timeout: 90_000 });
+await unauthorized.getByRole("button", { name: /Log reading requires an active operator role/i }).click();
+const unauthorizedGuard = {
+  roleGuardVisible: await unauthorized.getByText("Operator authorization required", { exact: true }).isVisible(),
+  reasonVisible: await unauthorized.getByText(/is not an active FieldSignal operator/).isVisible(),
+};
+await unauthorized.getByRole("button", { name: /Open access registry/i }).click();
+await unauthorized.locator(".chain-loader").waitFor({ state: "hidden", timeout: 90_000 });
+unauthorizedGuard.accessRegistryReached = await unauthorized
+  .getByText("ON-CHAIN FIELD CREDENTIALS", { exact: true })
+  .isVisible();
+await unauthorized.close();
 await browser.close();
-console.log(JSON.stringify({ viewports: results, connectedState }, null, 2));
+console.log(JSON.stringify({ viewports: results, connectedState, unauthorizedGuard }, null, 2));

@@ -77,7 +77,7 @@ class Inspection:
     id: str
     incident_id: str
     assigned_by: Address
-    assignee: str
+    assignee: Address
     plan: str
     findings: str
     evidence_url: str
@@ -88,6 +88,7 @@ class Inspection:
     analysis: str
     required_response_met: bool
     response_assessment: str
+    attempt_count: u32
 
 
 class FieldSignal(gl.Contract):
@@ -147,6 +148,11 @@ class FieldSignal(gl.Contract):
             return account.lower()
         return str(account).lower()
 
+    def _address(self, account) -> Address:
+        if isinstance(account, str):
+            return Address(account)
+        return account
+
     def _station(self, item_id: str, name: str, region: str) -> None:
         self.station_ids.append(item_id)
         self.stations[item_id] = Station(
@@ -201,12 +207,14 @@ class FieldSignal(gl.Contract):
         return key in self.inspectors and self.inspectors[key]
 
     def _require_station_operator(self, station_id: str) -> None:
-        station = self.stations[station_id]
-        sender = gl.message.sender_address
-        if sender != station.operator and not self._is_operator(sender):
+        if not self._is_station_operator(station_id, gl.message.sender_address):
             raise gl.vm.UserError(
                 f"{EXPECTED} Authorized station operator required"
             )
+
+    def _is_station_operator(self, station_id: str, account: Address) -> bool:
+        station = self.stations[station_id]
+        return account == station.operator or self._is_operator(account)
 
     def _canonical_response(self, response_code: str) -> str:
         responses = {
@@ -230,7 +238,7 @@ class FieldSignal(gl.Contract):
         return verdict == "INVALID_EVIDENCE" and response_code == "EVIDENCE_REQUIRED"
 
     @gl.public.write
-    def set_operator(self, account: str, enabled: bool) -> None:
+    def set_operator(self, account: Address, enabled: bool) -> None:
         self._owner_only()
         key = self._account_key(account)
         if key not in self.operators:
@@ -238,7 +246,7 @@ class FieldSignal(gl.Contract):
         self.operators[key] = enabled
 
     @gl.public.write
-    def set_inspector(self, account: str, enabled: bool) -> None:
+    def set_inspector(self, account: Address, enabled: bool) -> None:
         self._owner_only()
         key = self._account_key(account)
         if key not in self.inspectors:
@@ -246,8 +254,38 @@ class FieldSignal(gl.Contract):
         self.inspectors[key] = enabled
 
     @gl.public.write
+    def configure_access(
+        self,
+        account: Address,
+        operator_enabled: bool,
+        inspector_enabled: bool,
+        station_id: str,
+    ) -> None:
+        self._owner_only()
+        account = self._address(account)
+        key = self._account_key(account)
+        if key not in self.operators:
+            self.operator_accounts.append(key)
+        if key not in self.inspectors:
+            self.inspector_accounts.append(key)
+        self.operators[key] = operator_enabled
+        self.inspectors[key] = inspector_enabled
+
+        if station_id != "":
+            if station_id not in self.stations:
+                raise gl.vm.UserError(f"{EXPECTED} Station not found")
+            if not operator_enabled:
+                raise gl.vm.UserError(
+                    f"{EXPECTED} Station assignment requires operator role"
+                )
+            station = self.stations[station_id]
+            station.operator = account
+            self.stations[station_id] = station
+
+    @gl.public.write
     def set_station_operator(self, station_id: str, operator: Address) -> None:
         self._owner_only()
+        operator = self._address(operator)
         if station_id not in self.stations:
             raise gl.vm.UserError(f"{EXPECTED} Station not found")
         if not self._is_operator(operator):
@@ -343,6 +381,10 @@ class FieldSignal(gl.Contract):
             raise gl.vm.UserError(f"{EXPECTED} Signal not pending")
         sensor = self.sensors[signal.sensor_id]
         station = self.stations[sensor.station_id]
+        if not self._is_station_operator(sensor.station_id, signal.reporter):
+            raise gl.vm.UserError(
+                f"{EXPECTED} Recorded reporter authorization is not active"
+            )
 
         def assess() -> dict:
             try:
@@ -440,12 +482,13 @@ The verdict and response code must be supported by concrete facts in the retriev
 
     @gl.public.write
     def assign_inspection(
-        self, incident_id: str, assignee: str, plan: str
+        self, incident_id: str, assignee: Address, plan: str
     ) -> str:
         if incident_id not in self.incidents:
             raise gl.vm.UserError(f"{EXPECTED} Incident not found")
         incident = self.incidents[incident_id]
         self._require_station_operator(incident.station_id)
+        assignee = self._address(assignee)
         if incident.inspection_id != "":
             raise gl.vm.UserError(f"{EXPECTED} Inspection already assigned")
         if not self._is_inspector(assignee):
@@ -457,7 +500,7 @@ The verdict and response code must be supported by concrete facts in the retriev
             item_id,
             incident_id,
             gl.message.sender_address,
-            self._account_key(assignee),
+            assignee,
             plan.strip(),
             "",
             "",
@@ -468,6 +511,7 @@ The verdict and response code must be supported by concrete facts in the retriev
             "",
             False,
             "",
+            u32(0),
         )
         incident.inspection_id = item_id
         incident.status = "INSPECTION"
@@ -484,9 +528,9 @@ The verdict and response code must be supported by concrete facts in the retriev
         if inspection_id not in self.inspections:
             raise gl.vm.UserError(f"{EXPECTED} Inspection not found")
         inspection = self.inspections[inspection_id]
-        if inspection.status != "ASSIGNED":
-            raise gl.vm.UserError(f"{EXPECTED} Inspection not assigned")
-        if self._account_key(gl.message.sender_address) != inspection.assignee:
+        if inspection.status not in ("ASSIGNED", "ACTION_REQUIRED"):
+            raise gl.vm.UserError(f"{EXPECTED} Inspection is not accepting findings")
+        if gl.message.sender_address != inspection.assignee:
             raise gl.vm.UserError(f"{EXPECTED} Only recorded assignee may submit")
         if not self._is_inspector(gl.message.sender_address):
             raise gl.vm.UserError(f"{EXPECTED} Inspector role is not active")
@@ -494,6 +538,13 @@ The verdict and response code must be supported by concrete facts in the retriev
         self._https(evidence_url)
         inspection.findings = findings.strip()
         inspection.evidence_url = evidence_url.strip()
+        inspection.evidence_digest = ""
+        inspection.evidence_verified = False
+        inspection.verdict = ""
+        inspection.analysis = ""
+        inspection.required_response_met = False
+        inspection.response_assessment = ""
+        inspection.attempt_count += u32(1)
         inspection.status = "PENDING_REVIEW"
         self.inspections[inspection.id] = inspection
 
@@ -504,6 +555,8 @@ The verdict and response code must be supported by concrete facts in the retriev
         inspection = self.inspections[inspection_id]
         if inspection.status != "PENDING_REVIEW":
             raise gl.vm.UserError(f"{EXPECTED} Inspection not ready")
+        if not self._is_inspector(inspection.assignee):
+            raise gl.vm.UserError(f"{EXPECTED} Recorded inspector role is not active")
         incident = self.incidents[inspection.incident_id]
         signal = self.signals[incident.signal_id]
         sensor = self.sensors[signal.sensor_id]
@@ -571,17 +624,15 @@ Set required_response_met true only when the evidence directly proves every mate
         inspection.response_assessment = decision["response_assessment"]
         inspection.evidence_digest = decision["evidence_digest"]
         inspection.evidence_verified = len(inspection.evidence_digest) == 64
-        inspection.status = "RESOLVED"
-
         incident.required_response_met = inspection.required_response_met
         incident.response_assessment = inspection.response_assessment
-        incident.status = (
-            "CLOSED"
-            if inspection.evidence_verified
+        response_complete = (
+            inspection.evidence_verified
             and inspection.required_response_met
             and inspection.verdict in ("CONFIRMED", "FALSE_ALARM")
-            else "ACTION_REQUIRED"
         )
+        inspection.status = "RESOLVED" if response_complete else "ACTION_REQUIRED"
+        incident.status = "CLOSED" if response_complete else "ACTION_REQUIRED"
         if inspection.verdict == "FALSE_ALARM" and inspection.evidence_verified:
             sensor.status = "ACTIVE"
             sensor.trust = u32(max(0, int(sensor.trust) - 5))
@@ -624,6 +675,19 @@ Set required_response_met true only when the evidence directly proves every mate
             "operator": key in self.operators and self.operators[key],
             "inspector": key in self.inspectors and self.inspectors[key],
             "owner": key == self._account_key(self.owner),
+        }
+
+    @gl.public.view
+    def get_access_registry(self) -> dict:
+        return {
+            "operators": [
+                {"account": key, "enabled": self.operators[key]}
+                for key in self.operator_accounts
+            ],
+            "inspectors": [
+                {"account": key, "enabled": self.inspectors[key]}
+                for key in self.inspector_accounts
+            ],
         }
 
     @gl.public.view

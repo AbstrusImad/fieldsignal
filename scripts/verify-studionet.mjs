@@ -14,13 +14,15 @@ const read = (functionName, args = []) => client.readContract({
   jsonSafeReturn: true,
 });
 
-const [overview, stations, sensors, signals, incidents, inspections] = await Promise.all([
+const [overview, stations, sensors, signals, incidents, inspections, registry, ownerRoles] = await Promise.all([
   read("get_overview"),
   read("get_stations"),
   read("get_sensors"),
   read("get_signals"),
   read("get_incidents"),
   read("get_inspections"),
+  read("get_access_registry"),
+  read("get_roles", [deployment.deployer]),
 ]);
 assert.equal(stations.length, 6);
 assert.equal(sensors.length, 8);
@@ -32,6 +34,13 @@ assert.ok(signals.filter((item) => item.status === "RESOLVED").every((item) => i
 assert.ok(incidents.every((item) => item.response_code && item.response));
 assert.ok(inspections.filter((item) => item.status === "RESOLVED").every((item) => item.evidence_verified));
 assert.ok(inspections.filter((item) => item.status === "RESOLVED").every((item) => item.response_assessment));
+assert.ok(inspections.every((item) => Number(item.attempt_count) >= 1));
+assert.ok(inspections.every((item) => item.assignee.toLowerCase() === deployment.deployer.toLowerCase()));
+assert.equal(ownerRoles.owner, true);
+assert.equal(ownerRoles.operator, true);
+assert.equal(ownerRoles.inspector, true);
+assert.ok(registry.operators.some((item) => item.account.toLowerCase() === deployment.deployer.toLowerCase() && item.enabled));
+assert.ok(registry.inspectors.some((item) => item.account.toLowerCase() === deployment.deployer.toLowerCase() && item.enabled));
 
 const output = {
   verifiedAt: new Date().toISOString(),
@@ -47,6 +56,8 @@ const output = {
   },
   evidenceVerified: true,
   requiredResponseRecorded: true,
+  authenticatedActorsVerified: true,
+  accessRegistryVerified: true,
 };
 writeFileSync(
   resolve(root, "deployments/live-state-studionet.json"),

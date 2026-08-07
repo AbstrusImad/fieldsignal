@@ -1,7 +1,7 @@
 {
-  "verifiedAt": "2026-08-06T15:11:46.470Z",
+  "verifiedAt": "2026-08-07T12:37:08.839Z",
   "network": "StudioNet",
-  "contractAddress": "0x62a1532a70d696199BbDC8C4C2c45b338090A38a",
+  "contractAddress": "0x978653d2e864f7A2bE1E6695d742d78809585D74",
   "overview": {
     "active_sensors": 7,
     "incidents": 2,
@@ -9,18 +9,20 @@
     "inspectors": 1,
     "open_incidents": 1,
     "operators": 1,
-    "pending_signals": 1,
+    "pending_signals": 0,
     "sensors": 8,
-    "signals": 4,
+    "signals": 3,
     "stations": 6
   },
   "counts": {
     "stations": 6,
     "sensors": 8,
-    "signals": 4,
+    "signals": 3,
     "incidents": 2,
     "inspections": 1
   },
   "evidenceVerified": true,
-  "requiredResponseRecorded": true
+  "requiredResponseRecorded": true,
+  "authenticatedActorsVerified": true,
+  "accessRegistryVerified": true
 }

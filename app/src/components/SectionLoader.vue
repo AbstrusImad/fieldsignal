@@ -17,6 +17,10 @@ const labels = {
     title: "Assembling response files",
     detail: "Loading incidents, assigned inspectors, findings, and required-response assessments from StudioNet.",
   },
+  access: {
+    title: "Verifying field credentials",
+    detail: "Reading active operators, inspectors, and recorded station assignments directly from StudioNet.",
+  },
 };
 
 const copy = computed(() => labels[props.section] || labels.survey);
@@ -45,4 +49,3 @@ const copy = computed(() => labels[props.section] || labels.survey);
     </div>
   </article>
 </template>
-

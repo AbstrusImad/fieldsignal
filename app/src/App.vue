@@ -14,7 +14,9 @@ import {
   Radio,
   RefreshCw,
   Satellite,
+  ShieldCheck,
   Sparkles,
+  UserCog,
   X,
 } from "lucide-vue-next";
 import GuidePage from "./components/GuidePage.vue";
@@ -44,7 +46,7 @@ const selectedSignal = ref("");
 const selectedResponse = ref("");
 const sheet = ref(null);
 const tx = ref({ open: false, stage: "", title: "", hash: "", error: "", status: "" });
-const sectionLoading = ref({ survey: false, traces: false, response: false });
+const sectionLoading = ref({ survey: false, traces: false, response: false, access: false });
 
 const overview = ref({});
 const stations = ref([]);
@@ -53,6 +55,7 @@ const signals = ref([]);
 const incidents = ref([]);
 const inspections = ref([]);
 const roles = ref({ operator: false, inspector: false, owner: false });
+const accessRegistry = ref({ operators: [], inspectors: [] });
 
 const signalForm = ref({
   value: "42 ug/m3",
@@ -69,6 +72,13 @@ const inspectionForm = ref({
     "Field inspection confirmed the device condition and compared its reading against a traceable reference instrument with timestamped context.",
   evidence_url:
     "https://raw.githubusercontent.com/AbstrusImad/fieldsignal/main/docs/evidence/inspection-pm25.md",
+});
+const dispatchInspector = ref("");
+const accessForm = ref({
+  account: "",
+  operator: true,
+  inspector: false,
+  station_id: "STA-001",
 });
 
 const currentSensor = computed(
@@ -92,6 +102,9 @@ const currentResponse = computed(
   () =>
     responseFiles.value.find((item) => item.id === selectedResponse.value) ||
     responseFiles.value[0],
+);
+const activeInspectors = computed(() =>
+  (accessRegistry.value.inspectors || []).filter((item) => item.enabled),
 );
 const txIndex = computed(() => {
   if (tx.value.stage === "signature") return 1;
@@ -178,7 +191,7 @@ function logout() {
 }
 async function load({ quiet = false } = {}) {
   loading.value = true;
-  sectionLoading.value = { survey: true, traces: true, response: true };
+  sectionLoading.value = { survey: true, traces: true, response: true, access: true };
   if (!quiet) error.value = "";
   try {
     const values = [];
@@ -189,6 +202,7 @@ async function load({ quiet = false } = {}) {
       "get_signals",
       "get_incidents",
       "get_inspections",
+      "get_access_registry",
     ]) {
       values.push(await readContract(name));
     }
@@ -199,7 +213,9 @@ async function load({ quiet = false } = {}) {
       signals.value,
       incidents.value,
       inspections.value,
+      accessRegistry.value,
     ] = values;
+    dispatchInspector.value ||= activeInspectors.value[0]?.account || "";
     roles.value = wallet.value
       ? await readContract("get_roles", [wallet.value])
       : { operator: false, inspector: false, owner: false };
@@ -210,7 +226,7 @@ async function load({ quiet = false } = {}) {
     if (!quiet) error.value = formatError(cause);
   } finally {
     loading.value = false;
-    sectionLoading.value = { survey: false, traces: false, response: false };
+    sectionLoading.value = { survey: false, traces: false, response: false, access: false };
   }
 }
 
@@ -243,18 +259,33 @@ async function loadSection(target, { quiet = false } = {}) {
       sensors.value = nextSensors;
       signals.value = nextSignals;
       selectedSignal.value ||= signals.value[0]?.id || "";
-    } else {
-      const [nextOverview, nextIncidents, nextInspections, nextRoles] = await Promise.all([
+    } else if (target === "response") {
+      const [nextOverview, nextIncidents, nextInspections, nextRegistry, nextRoles] = await Promise.all([
         readContract("get_overview"),
         readContract("get_incidents"),
         readContract("get_inspections"),
+        readContract("get_access_registry"),
         wallet.value ? readContract("get_roles", [wallet.value]) : Promise.resolve(roles.value),
       ]);
       overview.value = nextOverview;
       incidents.value = nextIncidents;
       inspections.value = nextInspections;
+      accessRegistry.value = nextRegistry;
       roles.value = nextRoles;
+      dispatchInspector.value ||= activeInspectors.value[0]?.account || "";
       selectedResponse.value ||= responseFiles.value[0]?.id || "";
+    } else {
+      const [nextOverview, nextStations, nextRegistry, nextRoles] = await Promise.all([
+        readContract("get_overview"),
+        readContract("get_stations"),
+        readContract("get_access_registry"),
+        wallet.value ? readContract("get_roles", [wallet.value]) : Promise.resolve(roles.value),
+      ]);
+      overview.value = nextOverview;
+      stations.value = nextStations;
+      accessRegistry.value = nextRegistry;
+      roles.value = nextRoles;
+      dispatchInspector.value ||= activeInspectors.value[0]?.account || "";
     }
   } catch (cause) {
     if (!quiet) error.value = formatError(cause);
@@ -301,8 +332,15 @@ const resolveSignal = (id) =>
 const assignInspection = (incident) =>
   transact("Inspection dispatch", "assign_inspection", [
     incident.id,
-    wallet.value,
+    dispatchInspector.value,
     inspectionForm.value.plan,
+  ]);
+const configureAccess = () =>
+  transact("Access authorization", "configure_access", [
+    accessForm.value.account,
+    accessForm.value.operator,
+    accessForm.value.inspector,
+    accessForm.value.operator ? accessForm.value.station_id : "",
   ]);
 const submitInspection = (inspection) =>
   transact("Inspection evidence", "submit_inspection", [
@@ -414,6 +452,9 @@ onMounted(() => {
           </button>
           <button :class="{ active: section === 'response' }" @click="switchSection('response')">
             <FileCheck2 /><span>RESPONSE</span><small>03</small>
+          </button>
+          <button :class="{ active: section === 'access' }" @click="switchSection('access')">
+            <ShieldCheck /><span>ACCESS</span><small>04</small>
           </button>
         </nav>
 
@@ -547,7 +588,7 @@ onMounted(() => {
             <div v-else class="empty-file"><Radio /><b>No reports filed</b><span>Use the Survey file to log a reading.</span></div>
           </article>
 
-          <article v-else class="active-file response-file">
+          <article v-else-if="section === 'response'" class="active-file response-file">
             <div class="file-tab cyan-tab"><span>FIELD RESPONSE</span></div>
             <div class="response-tabs">
               <button
@@ -585,9 +626,19 @@ onMounted(() => {
                   <i :class="{ done: currentResponse.inspection_id }"></i>
                   <span>{{ currentResponse.inspection_id || "Inspection unassigned" }}</span>
                 </div>
+                <label v-if="!currentResponse.inspection_id && roles.operator" class="dispatch-select">
+                  <span>AUTHORIZED INSPECTOR</span>
+                  <select v-model="dispatchInspector" required>
+                    <option disabled value="">Select an active inspector</option>
+                    <option v-for="item in activeInspectors" :key="item.account" :value="item.account">
+                      {{ short(item.account) }}
+                    </option>
+                  </select>
+                </label>
                 <button
-                  v-if="!currentResponse.inspection_id && roles.operator && roles.inspector"
+                  v-if="!currentResponse.inspection_id && roles.operator"
                   class="pull-action"
+                  :disabled="!dispatchInspector"
                   @click="assignInspection(currentResponse)"
                 >
                   <span>DISPATCH INSPECTION</span><i></i>
@@ -613,11 +664,11 @@ onMounted(() => {
                   {{ currentResponse.evidence_verified ? "EVIDENCE VERIFIED" : "EVIDENCE ATTACHED" }} <ExternalLink />
                 </a>
                 <button
-                  v-if="currentResponse.status === 'ASSIGNED' && roles.inspector && currentResponse.assignee?.toLowerCase() === wallet?.toLowerCase()"
+                  v-if="['ASSIGNED', 'ACTION_REQUIRED'].includes(currentResponse.status) && roles.inspector && currentResponse.assignee?.toLowerCase() === wallet?.toLowerCase()"
                   class="pull-action"
                   @click="openInspection(currentResponse)"
                 >
-                  <span>FILE FINDINGS</span><i></i>
+                  <span>{{ currentResponse.status === 'ACTION_REQUIRED' ? 'FILE CORRECTION' : 'FILE FINDINGS' }}</span><i></i>
                 </button>
                 <button
                   v-if="currentResponse.status === 'PENDING_REVIEW'"
@@ -627,9 +678,49 @@ onMounted(() => {
                   <span>REVIEW EVIDENCE</span><i></i>
                 </button>
                 <div v-if="currentResponse.verdict" class="final-stamp">{{ currentResponse.verdict }}</div>
+                <small v-if="currentResponse.attempt_count" class="attempt-mark">REVIEW ATTEMPT {{ currentResponse.attempt_count }}</small>
               </template>
             </section>
             <div v-else class="empty-file"><Check /><b>No response files</b><span>No signal has opened a field incident.</span></div>
+          </article>
+
+          <article v-else class="active-file access-file">
+            <div class="file-tab access-tab"><span>AUTHORIZATION REGISTRY</span></div>
+            <header class="access-heading">
+              <div><small>ON-CHAIN FIELD CREDENTIALS</small><h2>Who may report and inspect</h2></div>
+              <ShieldCheck />
+            </header>
+            <div class="credential-ledger">
+              <section>
+                <span>OPERATORS / {{ overview.operators || 0 }}</span>
+                <div v-for="item in accessRegistry.operators" :key="`op-${item.account}`">
+                  <i :class="{ active: item.enabled }"></i><b>{{ short(item.account) }}</b><small>{{ item.enabled ? 'ACTIVE' : 'REVOKED' }}</small>
+                </div>
+              </section>
+              <section>
+                <span>INSPECTORS / {{ overview.inspectors || 0 }}</span>
+                <div v-for="item in accessRegistry.inspectors" :key="`in-${item.account}`">
+                  <i :class="{ active: item.enabled }"></i><b>{{ short(item.account) }}</b><small>{{ item.enabled ? 'ACTIVE' : 'REVOKED' }}</small>
+                </div>
+              </section>
+            </div>
+            <div class="station-assignments">
+              <span>RECORDED STATION OWNERSHIP</span>
+              <div v-for="station in stations" :key="station.id">
+                <b>{{ station.id }}</b><p>{{ station.name }}</p><code>{{ short(station.operator) }}</code>
+              </div>
+            </div>
+            <form v-if="roles.owner" class="access-console" @submit.prevent="configureAccess">
+              <header><UserCog /><div><b>Owner access console</b><small>One transaction updates roles and optional station assignment.</small></div></header>
+              <label><span>WALLET ADDRESS</span><input v-model="accessForm.account" pattern="0x[a-fA-F0-9]{40}" required /></label>
+              <label><span>STATION</span><select v-model="accessForm.station_id" :disabled="!accessForm.operator"><option v-for="station in stations" :key="station.id" :value="station.id">{{ station.id }} / {{ station.name }}</option></select></label>
+              <div class="role-switches">
+                <label><input v-model="accessForm.operator" type="checkbox" /><span>Operator</span></label>
+                <label><input v-model="accessForm.inspector" type="checkbox" /><span>Inspector</span></label>
+              </div>
+              <button type="submit"><ShieldCheck /> APPLY AUTHORIZATION</button>
+            </form>
+            <div v-else class="access-note"><ShieldCheck /><p>The registry is public. Only the contract owner can add, revoke, or assign operational credentials.</p></div>
           </article>
         </div>
 

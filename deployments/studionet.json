@@ -2,89 +2,98 @@
   "network": "studionet",
   "chainId": 61999,
   "contract": "FieldSignal",
-  "contractAddress": "0x62a1532a70d696199BbDC8C4C2c45b338090A38a",
-  "transactionHash": "0x5a6ce08d3010d95472dcb19cfcd75cf093fe581f1b7c4b9e2e6dbf56e746bb8e",
+  "contractAddress": "0x978653d2e864f7A2bE1E6695d742d78809585D74",
+  "transactionHash": "0x22f999c8bd65cd8689555f4d83dcc32b8d756eaf4c4d36eeb9f7cb091aabb889",
   "deployer": "0x95803126315A05E642D8E46CE1d77eA2199a2A6E",
   "publisher": "AbstrusImad",
   "explorer": "https://explorer-studio.genlayer.com",
   "status": "ACCEPTED",
   "executionResult": "FINISHED_WITH_RETURN",
-  "deployedAt": "2026-08-05T16:34:28.167Z",
-  "contractSha256": "2bb8d59ff52b75258cafdca93102ae9374dd52750bd7bc0becfe1b858d4bfbf7",
+  "deployedAt": "2026-08-07T12:27:33.132Z",
+  "contractSha256": "1902f29a93a889dde7dec26db2b59b8b6f71106f1931c08f622af6c8fd94d19d",
   "reviewRemediation": {
     "authenticatedOperators": true,
+    "authorizationRevalidatedAtConsensus": true,
+    "typedInspectorIdentity": true,
     "contractEvidenceRetrieval": true,
     "recordedInspectorRole": true,
-    "requiredResponseConsensus": true
+    "requiredResponseConsensus": true,
+    "ownerOnboardingInterface": true,
+    "correctiveEvidenceResubmission": true
   },
   "seed": {
     "transactions": {
+      "configure-owner-access": {
+        "hash": "0xe734b2eec21eb40280e9e6010ca254930d8e93068730d4b3e267b701d39ee033",
+        "functionName": "configure_access",
+        "status": "ACCEPTED",
+        "submittedAt": "2026-08-07T12:27:48.971Z",
+        "acceptedAt": "2026-08-07T12:27:55.566Z"
+      },
       "signal-pm25": {
-        "hash": "0x283a4e1d3b08790d3ecb3376e883925fc5863423dc50ba9e5efa512f8c557f51",
+        "hash": "0xbc23893e6e05912fdf36d9f407f5137f1bf54a6f2f21472ce258f200d5953c86",
         "functionName": "submit_signal",
         "status": "ACCEPTED",
-        "submittedAt": "2026-08-05T16:34:35.945Z",
-        "acceptedAt": "2026-08-05T16:34:42.281Z"
+        "submittedAt": "2026-08-07T12:27:56.421Z",
+        "acceptedAt": "2026-08-07T12:28:02.909Z"
       },
       "resolve-pm25": {
-        "hash": "0x4859ee356cae4645aab270f399b8a93adcbe63e815fdc2a7b92cec5631e0cd2a",
         "functionName": "resolve_signal",
-        "status": "ACCEPTED",
-        "submittedAt": "2026-08-05T16:34:42.949Z",
-        "acceptedAt": "2026-08-05T16:35:01.705Z"
+        "status": "SATISFIED_BY_STATE",
+        "stateProof": "SIG-0001:RESOLVED:2f7dfa6854057f58e2f797bb9a3eb1ab6dc0ba51814046453e7c65d31a455cce",
+        "verifiedAt": "2026-08-07T12:33:54.174Z"
       },
       "signal-soil": {
-        "hash": "0xdcc3737297d6dc088ffda942adadf53178fa901b9b18a2aec8cc86d24cbeced3",
+        "hash": "0xd936e2d419af65ec3e8fe3664ea000b4b2fb7d21ebdd1a43ea887b452062a319",
         "functionName": "submit_signal",
         "status": "ACCEPTED",
-        "submittedAt": "2026-08-05T16:35:02.394Z",
-        "acceptedAt": "2026-08-05T16:35:11.861Z"
+        "submittedAt": "2026-08-07T12:31:33.027Z",
+        "acceptedAt": "2026-08-07T12:31:39.549Z"
       },
       "resolve-soil": {
-        "hash": "0x03eaa9d58319a4ea99bd3f5d961bc6f579e0ae80fad746ef22c324d736bba8aa",
         "functionName": "resolve_signal",
-        "status": "ACCEPTED",
-        "submittedAt": "2026-08-05T16:35:12.452Z",
-        "acceptedAt": "2026-08-05T16:35:53.017Z"
+        "status": "SATISFIED_BY_STATE",
+        "stateProof": "SIG-0002:RESOLVED:9a7f8014aa9167fe55f5080eaa799652125f9f42dab05e81a82456dee170da8d",
+        "verifiedAt": "2026-08-07T12:33:55.339Z"
       },
       "signal-wind": {
-        "hash": "0xf59357884e32d58677cc568ace5849959fb56437565cb6955a210699366206f3",
+        "hash": "0xeb100fe30f0433d0882c49dcebc437a413d3195e10661f25e17c82f1a518006a",
         "functionName": "submit_signal",
         "status": "ACCEPTED",
-        "submittedAt": "2026-08-05T16:35:53.656Z",
-        "acceptedAt": "2026-08-05T16:36:03.089Z"
+        "submittedAt": "2026-08-07T12:33:12.618Z",
+        "acceptedAt": "2026-08-07T12:33:55.497Z"
       },
       "resolve-wind": {
-        "hash": "0xfc21d89189d13da9e6842f4e2b943f9e8eac0665582996c7aea0310aba34f3b6",
+        "hash": "0x1320a16ff4936809f293277590e8146eeaeaf398775441604ff4bf1e3522d46b",
         "functionName": "resolve_signal",
         "status": "ACCEPTED",
-        "submittedAt": "2026-08-05T16:36:03.639Z",
-        "acceptedAt": "2026-08-05T16:36:31.770Z"
+        "submittedAt": "2026-08-07T12:33:57.448Z",
+        "acceptedAt": "2026-08-07T12:34:29.035Z"
       },
       "assign-pm25": {
-        "hash": "0x6c4182cfecc3ef293f6c295a55ebfb00fc6c64228a7d29d68892d365e86883b0",
+        "hash": "0x628734d64466ad0dc6837b083f3ba1b0c5e448cfe7c44ad85610b4fbed9ca702",
         "functionName": "assign_inspection",
         "status": "ACCEPTED",
-        "submittedAt": "2026-08-05T16:36:33.611Z",
-        "acceptedAt": "2026-08-05T16:36:46.157Z"
+        "submittedAt": "2026-08-07T12:34:31.083Z",
+        "acceptedAt": "2026-08-07T12:34:37.475Z"
       },
       "inspect-pm25": {
-        "hash": "0x6de418bff69bac2658fb9afa50362b226ebc9a47100325e1c58d40b25989f1f2",
+        "hash": "0xf18cd232cabfc997a6678ec85e58cd72d9e58e14de7b33f4eb8acbb5b9b73d9b",
         "functionName": "submit_inspection",
         "status": "ACCEPTED",
-        "submittedAt": "2026-08-05T16:36:46.955Z",
-        "acceptedAt": "2026-08-05T16:36:56.378Z"
+        "submittedAt": "2026-08-07T12:34:38.351Z",
+        "acceptedAt": "2026-08-07T12:34:44.684Z"
       },
       "resolve-inspection-pm25": {
-        "hash": "0xddb4785e78e3a1a306282d8ff59a53f9df9e65b1300fcb81a137fcddffc4756b",
+        "hash": "0x711e4d750b89c4e72e81afdc2bf2667b3e203d0478159c7eb40b8d8ffd414ba8",
         "functionName": "resolve_inspection",
         "status": "ACCEPTED",
-        "submittedAt": "2026-08-05T16:36:57.060Z",
-        "acceptedAt": "2026-08-05T16:37:18.939Z"
+        "submittedAt": "2026-08-07T12:35:06.363Z",
+        "acceptedAt": "2026-08-07T12:35:44.059Z"
       }
     },
     "status": "ACCEPTED",
-    "transactionCount": 9,
-    "completedAt": "2026-08-05T16:37:18.941Z"
+    "transactionCount": 10,
+    "completedAt": "2026-08-07T12:35:44.060Z"
   }
 }

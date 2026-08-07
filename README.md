@@ -2,7 +2,7 @@
 
 **Authenticated environmental observations, validator-retrieved evidence, and accountable field response on GenLayer StudioNet.**
 
-[Live application](https://abstrusimad.github.io/fieldsignal/) | [Detailed operations guide](https://abstrusimad.github.io/fieldsignal/guide/) | [StudioNet contract](https://explorer-studio.genlayer.com/address/0x62a1532a70d696199BbDC8C4C2c45b338090A38a) | [Deployment transaction](https://explorer-studio.genlayer.com/tx/0x5a6ce08d3010d95472dcb19cfcd75cf093fe581f1b7c4b9e2e6dbf56e746bb8e) | [Contract source](./contracts/fieldsignal.py)
+[Live application](https://abstrusimad.github.io/fieldsignal/) | [Detailed operations guide](https://abstrusimad.github.io/fieldsignal/guide/) | [StudioNet contract](https://explorer-studio.genlayer.com/address/0x978653d2e864f7A2bE1E6695d742d78809585D74) | [Deployment transaction](https://explorer-studio.genlayer.com/tx/0x22f999c8bd65cd8689555f4d83dcc32b8d756eaf4c4d36eeb9f7cb091aabb889) | [Contract source](./contracts/fieldsignal.py)
 
 FieldSignal is a public operational protocol for turning physical sensor readings into evidence-bound incidents. It does not ask validators to judge an unverified URL or accept an arbitrary wallet as a field operator. Every reading is tied to an authorized on-chain operator, every inspection is assigned to a registered inspector, and every consensus run retrieves the linked HTTPS evidence from inside the intelligent contract before changing durable state.
 
@@ -21,6 +21,7 @@ FieldSignal combines those questions into one auditable lifecycle:
 7. Only that recorded inspector can submit findings.
 8. Validators retrieve the inspection evidence and decide whether every required action is proven.
 9. The incident closes only when verified evidence supports the response completion.
+10. An incomplete response returns to `ACTION_REQUIRED`, allowing the same recorded inspector to publish corrected evidence for another consensus attempt.
 
 ## How To Use The Live App
 
@@ -29,10 +30,11 @@ The **Field Guide** button on the closed case and the help control inside the op
 1. Open the [live application](https://abstrusimad.github.io/fieldsignal/) and select **Unlock with wallet**. FieldSignal requests accounts through standard EIP-1193 `eth_requestAccounts`; it does not invoke MetaMask Snaps.
 2. In **Survey**, choose a registered sensor, open **Log reading**, and submit a timestamped observation with a public HTTPS evidence URL. The included [PM2.5 evidence record](https://raw.githubusercontent.com/AbstrusImad/fieldsignal/main/docs/evidence/signal-pm25.md) can be used for review.
 3. Move to **Traces**, select the new signal, and run consensus. Keep the execution receipt open while validators retrieve the linked source and agree on its digest, verdict, severity, confidence, and required response code.
-4. If consensus opens an incident, enter **Response** and assign it to a registered inspector. The station operator cannot substitute an arbitrary wallet for that role.
-5. Using the recorded inspector account, file findings with public inspection evidence. The included [inspection record](https://raw.githubusercontent.com/AbstrusImad/fieldsignal/main/docs/evidence/inspection-pm25.md) demonstrates the expected structure.
-6. Run the inspection review. Validators retrieve the evidence again and check the incident's exact required response. The incident closes only when `required_response_met` is true.
-7. Follow **Trace** on the animated receipt to inspect the terminal StudioNet transaction result.
+4. The owner can use **Access** to atomically authorize a wallet as operator and/or inspector and optionally bind it to a station. The public registry shows active and revoked credentials.
+5. If consensus opens an incident, enter **Response**, select an active inspector from the on-chain registry, and dispatch it. The station operator cannot substitute an arbitrary wallet for that role.
+6. Using the recorded inspector account, file findings with public inspection evidence. The included [inspection record](https://raw.githubusercontent.com/AbstrusImad/fieldsignal/main/docs/evidence/inspection-pm25.md) demonstrates the expected structure.
+7. Run the inspection review. Validators retrieve the evidence again and check the incident's exact required response. If proof is incomplete, use **File correction** and submit a stronger record; the attempt counter remains on-chain.
+8. Follow **Trace** on the animated receipt to inspect the terminal StudioNet transaction result.
 
 The seeded deployment account (`0x95803126315A05E642D8E46CE1d77eA2199a2A6E`) holds owner, operator, and inspector roles so reviewers can exercise the complete lifecycle with that wallet. Any other wallet can read the live files but cannot perform protected actions until the owner grants the corresponding on-chain role.
 
@@ -42,11 +44,13 @@ This release directly addresses the requested GenLayer review controls.
 
 | Review requirement | Contract enforcement |
 | --- | --- |
-| Bind readings to authenticated sensors or authorized operators | `submit_signal` checks the sensor's station and requires its operator or an active operator-registry account; the sender is persisted as `reporter`. |
+| Bind readings to authenticated sensors or authorized operators | `submit_signal` checks the sensor's station and requires its operator or an active operator-registry account; the sender is persisted as a typed `Address` reporter and authorization is rechecked before consensus. |
 | Verify linked evidence contract-side | Both consensus methods call `gl.nondet.web.render`, hash the retrieved content with SHA-256, and persist `evidence_digest` plus `evidence_verified`. |
-| Enforce the recorded inspector role | Assignment requires an authorized operator and a registered inspector. Submission requires both the exact recorded assignee and an inspector role that remains active. |
+| Enforce the recorded inspector role | The assignee is stored as `Address`. Assignment requires a registered inspector; submission requires the exact assignee; consensus rechecks that the recorded inspector role remains active. |
 | Validate the response entering incident state | Signal validators must agree on `response_code`; the contract maps it to canonical response text stored in the incident. |
 | Check completion of the required response | Inspection validators independently agree on `required_response_met`; the boolean and assessment are persisted in both inspection and incident state. |
+| Preserve a safe correction path | An unproven response becomes `ACTION_REQUIRED` rather than terminal. The recorded inspector can replace findings and evidence, increment `attempt_count`, and request fresh consensus. |
+| Expose usable onboarding | The Access file reads the public registry and gives the owner a single `configure_access` transaction for roles and optional station assignment. |
 | Avoid unsupported Snap methods | Wallet connection uses standard EIP-1193 account access and never calls `client.connect`, `wallet_getSnaps`, or `wallet_requestSnaps`. |
 
 ## Consensus Boundary
@@ -77,7 +81,7 @@ The frontend owns navigation, wallet persistence, forms, transaction progress, a
 - **Inspector:** submits findings only for an inspection explicitly assigned to that account.
 - **Validator:** retrieves evidence and determines the state transition through GenLayer consensus.
 
-Role revocation is enforced at action time. A previously assigned inspector cannot submit after losing the inspector role.
+Role revocation is enforced at action and consensus time. A revoked reporter cannot resolve a pending signal, and a previously assigned inspector cannot submit or resolve findings after losing the inspector role.
 
 ### Evidence Integrity
 
@@ -108,7 +112,7 @@ The contract converts the agreed code into canonical text. This prevents an unch
 
 | Family | Write methods | Read methods |
 | --- | --- | --- |
-| Authorization | `set_operator`, `set_inspector`, `set_station_operator` | `get_roles`, `get_overview` |
+| Authorization | `configure_access`, `set_operator`, `set_inspector`, `set_station_operator` | `get_roles`, `get_access_registry`, `get_overview` |
 | Instrument registry | `enroll_sensor` | `get_stations`, `get_sensors` |
 | Observation consensus | `submit_signal`, `resolve_signal` | `get_signals`, `get_incidents` |
 | Response operations | `assign_inspection`, `submit_inspection`, `resolve_inspection` | `get_inspections` |
@@ -119,8 +123,8 @@ The contract converts the agreed code into canonical text. This prevents an unch
 | --- | --- |
 | Network | GenLayer StudioNet |
 | Chain ID | `61999` |
-| Contract | `0x62a1532a70d696199BbDC8C4C2c45b338090A38a` |
-| Deployment transaction | `0x5a6ce08d3010d95472dcb19cfcd75cf093fe581f1b7c4b9e2e6dbf56e746bb8e` |
+| Contract | `0x978653d2e864f7A2bE1E6695d742d78809585D74` |
+| Deployment transaction | `0x22f999c8bd65cd8689555f4d83dcc32b8d756eaf4c4d36eeb9f7cb091aabb889` |
 | Deployer | Account 0, `0x95803126315A05E642D8E46CE1d77eA2199a2A6E` |
 | Explorer | `https://explorer-studio.genlayer.com` |
 
@@ -157,6 +161,7 @@ The direct suite covers:
 
 - Genesis role registration
 - Owner-only role administration
+- Atomic role onboarding and station assignment
 - Unauthorized reading rejection
 - Authorized reporter persistence
 - Contract-side evidence retrieval and SHA-256 storage
@@ -164,8 +169,10 @@ The direct suite covers:
 - Prevention of permissionless inspection self-assignment
 - Recorded-assignee enforcement
 - Inspector revocation after assignment
+- Reporter and inspector authorization rechecked before consensus
 - Required-response completion persisted in incident state
 - `ACTION_REQUIRED` when material response actions are unproven
+- Corrected-evidence resubmission with an on-chain attempt counter
 
 Direct mode executes the leader path quickly; the StudioNet seed and verification scripts exercise live validator consensus and deployed state.
 
@@ -188,7 +195,8 @@ deployments/                      Public deployment and accepted transaction rec
 - Evidence is retrieved inside consensus and bound to state by digest.
 - Response codes are constrained by verdict compatibility.
 - Inspection assignment cannot be claimed by an arbitrary wallet.
-- Inspector authorization is checked both at assignment and submission.
+- Reporter authorization is checked at submission and signal consensus.
+- Inspector authorization is checked at assignment, submission, and inspection consensus.
 - Incident closure requires verified evidence and a consensus-confirmed completed response.
 - The StudioNet release is an advanced test deployment, not a certified environmental monitoring service.
 

@@ -73,6 +73,31 @@ def test_only_owner_manages_roles(direct_vm, direct_deploy, direct_alice, direct
         contract.set_inspector(account(direct_bob), True)
 
 
+def test_owner_can_atomically_onboard_station_operator_and_inspector(
+    direct_vm, direct_deploy, direct_alice, direct_bob
+):
+    contract = deploy(direct_vm, direct_deploy, direct_alice)
+    contract.configure_access(account(direct_bob), True, True, "STA-001")
+
+    roles = contract.get_roles(account(direct_bob))
+    station = contract.get_stations()[0]
+    registry = contract.get_access_registry()
+    assert roles["operator"] is True
+    assert roles["inspector"] is True
+    assert str(station.operator).lower() == account(direct_bob)
+    assert any(
+        item["account"] == account(direct_bob).lower() and item["enabled"]
+        for item in registry["operators"]
+    )
+    assert any(
+        item["account"] == account(direct_bob).lower() and item["enabled"]
+        for item in registry["inspectors"]
+    )
+
+    with direct_vm.expect_revert("Station assignment requires operator role"):
+        contract.configure_access(account(direct_bob), False, True, "STA-002")
+
+
 def test_readings_require_authorized_operator(
     direct_vm, direct_deploy, direct_alice, direct_bob
 ):
@@ -116,6 +141,26 @@ def test_contract_retrieves_and_hashes_signal_evidence(
     assert incident.id == incident_id
     assert incident.response_code == "DISPATCH_INSPECTION"
     assert "authorized inspector" in incident.response.lower()
+
+
+def test_reporter_authorization_is_rechecked_during_consensus(
+    direct_vm, direct_deploy, direct_alice, direct_bob
+):
+    contract = deploy(direct_vm, direct_deploy, direct_alice)
+    contract.set_operator(account(direct_bob), True)
+    direct_vm.sender = direct_bob
+    signal_id = contract.submit_signal(
+        "SEN-001",
+        "86 ug/m3",
+        "2026-08-05T12:00:00Z",
+        "This authorized reading includes corroborated station context and is pending validator review when the role is revoked.",
+        SIGNAL_URL,
+    )
+    direct_vm.sender = direct_alice
+    contract.set_operator(account(direct_bob), False)
+
+    with direct_vm.expect_revert("Recorded reporter authorization is not active"):
+        contract.resolve_signal(signal_id)
 
 
 def test_unreachable_signal_evidence_cannot_open_incident(
@@ -168,7 +213,7 @@ def test_inspection_assignment_requires_operator_and_registered_inspector(
     ) == "INS-0001"
     inspection = contract.get_inspections()[0]
     assert str(inspection.assigned_by).lower() == account(direct_alice)
-    assert inspection.assignee == account(direct_bob)
+    assert str(inspection.assignee).lower() == account(direct_bob)
 
 
 def test_recorded_inspector_role_is_enforced_at_submission(
@@ -202,6 +247,30 @@ def test_recorded_inspector_role_is_enforced_at_submission(
         )
 
 
+def test_recorded_inspector_role_is_rechecked_during_consensus(
+    direct_vm, direct_deploy, direct_alice, direct_bob
+):
+    contract = deploy(direct_vm, direct_deploy, direct_alice)
+    _, incident_id = submit_incident(contract, direct_vm, direct_alice)
+    contract.set_inspector(account(direct_bob), True)
+    inspection_id = contract.assign_inspection(
+        incident_id,
+        account(direct_bob),
+        "Inspect the sensor and collect a co-located reference reading with timestamped evidence and source photographs.",
+    )
+    direct_vm.sender = direct_bob
+    contract.submit_inspection(
+        inspection_id,
+        "The assigned inspector collected reference readings and documented the response before authorization was withdrawn prior to consensus.",
+        INSPECTION_URL,
+    )
+    direct_vm.sender = direct_alice
+    contract.set_inspector(account(direct_bob), False)
+
+    with direct_vm.expect_revert("Recorded inspector role is not active"):
+        contract.resolve_inspection(inspection_id)
+
+
 def test_validators_persist_required_response_result_in_incident(
     direct_vm, direct_deploy, direct_alice, direct_bob
 ):
@@ -223,8 +292,9 @@ def test_validators_persist_required_response_result_in_incident(
         r".*evidence\.example/inspection-001.*",
         {"status": 200, "body": INSPECTION_BODY},
     )
+    evidence_digest = hashlib.sha256(INSPECTION_BODY.encode()).hexdigest()
     direct_vm.mock_llm(
-        r".*Review an authorized environmental inspection.*",
+        rf".*{evidence_digest}.*",
         json.dumps(
             {
                 "verdict": "CONFIRMED",
@@ -241,6 +311,7 @@ def test_validators_persist_required_response_result_in_incident(
     assert inspection.evidence_verified is True
     assert inspection.evidence_digest == hashlib.sha256(INSPECTION_BODY.encode()).hexdigest()
     assert inspection.required_response_met is True
+    assert inspection.attempt_count == 1
     assert incident.required_response_met is True
     assert incident.response_assessment == inspection.response_assessment
     assert incident.status == "CLOSED"
@@ -265,8 +336,11 @@ def test_response_remains_action_required_when_not_proven(
         r".*evidence\.example/inspection-001.*",
         {"status": 200, "body": "A visual enclosure check was completed."},
     )
+    evidence_digest = hashlib.sha256(
+        "A visual enclosure check was completed.".encode()
+    ).hexdigest()
     direct_vm.mock_llm(
-        r".*Review an authorized environmental inspection.*",
+        rf".*{evidence_digest}.*",
         json.dumps(
             {
                 "verdict": "ESCALATE",
@@ -281,3 +355,61 @@ def test_response_remains_action_required_when_not_proven(
     incident = contract.get_incidents()[0]
     assert incident.required_response_met is False
     assert incident.status == "ACTION_REQUIRED"
+
+
+def test_action_required_inspection_accepts_corrected_evidence(
+    direct_vm, direct_deploy, direct_alice
+):
+    contract = deploy(direct_vm, direct_deploy, direct_alice)
+    _, incident_id = submit_incident(contract, direct_vm, direct_alice)
+    inspection_id = contract.assign_inspection(
+        incident_id,
+        account(direct_alice),
+        "Inspect the sensor and collect a co-located reference reading with timestamped evidence and source photographs.",
+    )
+    contract.submit_inspection(
+        inspection_id,
+        "The initial field record documents only a visual enclosure check and does not yet prove every required response action.",
+        INSPECTION_URL,
+    )
+    direct_vm.mock_web(r".*inspection-001.*", {"status": 200, "body": "Visual check only."})
+    initial_digest = hashlib.sha256("Visual check only.".encode()).hexdigest()
+    direct_vm.mock_llm(
+        rf".*{initial_digest}.*",
+        json.dumps(
+            {
+                "verdict": "ESCALATE",
+                "required_response_met": False,
+                "analysis": "Required measurements are absent.",
+                "response_assessment": "The retrieved record lacks the required reference reading and source-condition documentation.",
+            }
+        ),
+    )
+    contract.resolve_inspection(inspection_id)
+    assert contract.get_inspections()[0].status == "ACTION_REQUIRED"
+
+    contract.submit_inspection(
+        inspection_id,
+        "The corrected record includes the co-located reference reading, source photographs, sensor condition, and increased sampling cadence.",
+        "https://evidence.example/inspection-002",
+    )
+    direct_vm.mock_web(r".*inspection-002.*", {"status": 200, "body": INSPECTION_BODY})
+    corrected_digest = hashlib.sha256(INSPECTION_BODY.encode()).hexdigest()
+    direct_vm.mock_llm(
+        rf".*{corrected_digest}.*",
+        json.dumps(
+            {
+                "verdict": "CONFIRMED",
+                "required_response_met": True,
+                "analysis": "The corrected record proves the required field response.",
+                "response_assessment": "Reference measurement, source documentation, sensor inspection, and increased sampling are evidenced.",
+            }
+        ),
+    )
+    contract.resolve_inspection(inspection_id)
+
+    inspection = contract.get_inspections()[0]
+    incident = contract.get_incidents()[0]
+    assert inspection.attempt_count == 2
+    assert inspection.status == "RESOLVED"
+    assert incident.status == "CLOSED"

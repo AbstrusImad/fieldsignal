@@ -57,9 +57,13 @@ const deployment = {
   contractSha256,
   reviewRemediation: {
     authenticatedOperators: true,
+    authorizationRevalidatedAtConsensus: true,
+    typedInspectorIdentity: true,
     contractEvidenceRetrieval: true,
     recordedInspectorRole: true,
     requiredResponseConsensus: true,
+    ownerOnboardingInterface: true,
+    correctiveEvidenceResubmission: true,
   },
   seed: { transactions: {}, status: "PENDING" },
 };

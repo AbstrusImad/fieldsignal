@@ -31,36 +31,47 @@ const isBusy = (error) => /Server busy|rate limit|-32429|-32028|429/i.test(
 );
 
 async function submit(stage, functionName, args) {
-  if (deployment.seed.transactions[stage]?.status === "ACCEPTED") return;
-  let hash;
-  for (let attempt = 1; attempt <= 30; attempt += 1) {
+  if (["ACCEPTED", "SATISFIED_BY_STATE"].includes(deployment.seed.transactions[stage]?.status)) return;
+  let hash = deployment.seed.transactions[stage]?.hash;
+  if (!hash) {
+    for (let attempt = 1; attempt <= 30; attempt += 1) {
+      try {
+        hash = await client.writeContract({
+          address: deployment.contractAddress,
+          functionName,
+          args,
+          leaderOnly: false,
+        });
+        break;
+      } catch (error) {
+        if (!isBusy(error) || attempt === 30) throw error;
+        await new Promise((done) => setTimeout(done, 10_000));
+      }
+    }
+    deployment.seed.transactions[stage] = {
+      hash,
+      functionName,
+      status: "SUBMITTED",
+      submittedAt: new Date().toISOString(),
+    };
+    save();
+    console.log(`${stage}: ${hash}`);
+  }
+  let receipt;
+  for (let attempt = 1; attempt <= 12; attempt += 1) {
     try {
-      hash = await client.writeContract({
-        address: deployment.contractAddress,
-        functionName,
-        args,
-        leaderOnly: false,
+      receipt = await client.waitForTransactionReceipt({
+        hash,
+        status: TransactionStatus.ACCEPTED,
+        retries: 180,
+        interval: 6_000,
       });
       break;
     } catch (error) {
-      if (!isBusy(error) || attempt === 30) throw error;
-      await new Promise((done) => setTimeout(done, 5_000));
+      if (!isBusy(error) || attempt === 12) throw error;
+      await new Promise((done) => setTimeout(done, 65_000));
     }
   }
-  deployment.seed.transactions[stage] = {
-    hash,
-    functionName,
-    status: "SUBMITTED",
-    submittedAt: new Date().toISOString(),
-  };
-  save();
-  console.log(`${stage}: ${hash}`);
-  const receipt = await client.waitForTransactionReceipt({
-    hash,
-    status: TransactionStatus.ACCEPTED,
-    retries: 180,
-    interval: 3_000,
-  });
   const leader = receipt.consensus_data?.leader_receipt?.[0];
   const succeeded =
     receipt.txExecutionResultName === ExecutionResult.FINISHED_WITH_RETURN ||
@@ -75,7 +86,36 @@ async function submit(stage, functionName, args) {
   save();
 }
 
+async function ensureSignalResolved(stage, signalId) {
+  const signals = await client.readContract({
+    address: deployment.contractAddress,
+    functionName: "get_signals",
+    args: [],
+    jsonSafeReturn: true,
+  });
+  const signal = signals.find((item) => item.id === signalId);
+  if (signal?.status === "RESOLVED") {
+    const previous = deployment.seed.transactions[stage];
+    deployment.seed.transactions[stage] = {
+      functionName: "resolve_signal",
+      status: "SATISFIED_BY_STATE",
+      stateProof: `${signalId}:RESOLVED:${signal.evidence_digest}`,
+      supersededHash: previous?.status === "SUBMITTED" ? previous.hash : undefined,
+      verifiedAt: new Date().toISOString(),
+    };
+    save();
+    return;
+  }
+  await submit(stage, "resolve_signal", [signalId]);
+}
+
 const base = "https://raw.githubusercontent.com/AbstrusImad/fieldsignal/main/docs/evidence";
+await submit("configure-owner-access", "configure_access", [
+  account.address,
+  true,
+  true,
+  "STA-001",
+]);
 await submit("signal-pm25", "submit_signal", [
   "SEN-001",
   "86 ug/m3",
@@ -83,7 +123,7 @@ await submit("signal-pm25", "submit_signal", [
   "Three consecutive elevated readings were corroborated by a co-located reference instrument while freight loading remained active upwind.",
   `${base}/signal-pm25.md`,
 ]);
-await submit("resolve-pm25", "resolve_signal", ["SIG-0001"]);
+await ensureSignalResolved("resolve-pm25", "SIG-0001");
 await submit("signal-soil", "submit_signal", [
   "SEN-003",
   "22%",
@@ -91,7 +131,7 @@ await submit("signal-soil", "submit_signal", [
   "Soil moisture fell below baseline during a dry interval while nearby plots showed similar reductions and diagnostics remained clean.",
   `${base}/signal-soil.md`,
 ]);
-await submit("resolve-soil", "resolve_signal", ["SIG-0002"]);
+await ensureSignalResolved("resolve-soil", "SIG-0002");
 await submit("signal-wind", "submit_signal", [
   "SEN-007",
   "92 m/s",
@@ -99,7 +139,7 @@ await submit("signal-wind", "submit_signal", [
   "The value jumped from six to ninety-two within one interval, neighboring stations remained ordinary, and diagnostics reported checksum failures.",
   `${base}/signal-wind.md`,
 ]);
-await submit("resolve-wind", "resolve_signal", ["SIG-0003"]);
+await ensureSignalResolved("resolve-wind", "SIG-0003");
 
 const incidents = await client.readContract({
   address: deployment.contractAddress,

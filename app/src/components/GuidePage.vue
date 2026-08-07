@@ -68,12 +68,12 @@ defineProps({
               <code>0x95803126315A05E642D8E46CE1d77eA2199a2A6E</code> is seeded as owner,
               operator, and inspector so the complete lifecycle can be tested. Other wallets
               can read every public record but protected controls remain unavailable until the
-              owner grants the required role on-chain.
+              owner grants the required role from the app's <b>Access</b> file.
             </p>
             <div class="chapter-checks">
               <span><CheckCircle2 /> Use a browser wallet that exposes standard EIP-1193 accounts.</span>
               <span><CheckCircle2 /> Keep public evidence reachable over HTTPS.</span>
-              <span><CheckCircle2 /> Use the seeded wallet to review every protected action.</span>
+              <span><CheckCircle2 /> Use the seeded owner wallet or onboard a separate operator and inspector in Access.</span>
             </div>
           </div>
         </section>
@@ -109,7 +109,9 @@ defineProps({
             <p>
               The contract rejects unknown sensors and unauthorized senders. A reading may be
               filed only by that station's operator or an account in the active operator
-              registry; the sender is permanently stored as the reading's reporter.
+              registry; the sender is permanently stored as the reading's typed reporter address.
+              That authorization is checked again when consensus starts, so a revoked reporter
+              cannot turn a pending reading into incident state.
             </p>
             <a class="sample-link" href="https://raw.githubusercontent.com/AbstrusImad/fieldsignal/main/docs/evidence/signal-pm25.md" target="_blank">
               OPEN SAMPLE SENSOR EVIDENCE <ExternalLink />
@@ -147,10 +149,10 @@ defineProps({
             <h2>Dispatch the recorded inspector</h2>
             <ol>
               <li>Open <b>Response</b> and select an incident without an inspection.</li>
-              <li>Press <b>Dispatch inspection</b>. The station operator assigns an active inspector and records a field plan.</li>
+              <li>Select a wallet from the live <b>Authorized inspector</b> registry, then press <b>Dispatch inspection</b>. The station operator records that exact address and the field plan.</li>
               <li>The resulting inspection stores the exact assignee. Another wallet cannot claim or submit that inspection.</li>
             </ol>
-            <p class="note"><b>Enforced twice:</b> inspector status is checked when the assignment is created and again when findings are submitted. Revoking the role blocks a previously assigned inspector.</p>
+            <p class="note"><b>Enforced throughout:</b> inspector status is checked at assignment, findings submission, and consensus resolution. Revoking the role blocks the stored assignee before validator output can alter the incident.</p>
           </div>
         </section>
 
@@ -168,6 +170,9 @@ defineProps({
               The inspection verdict, evidence digest, response assessment, and completion
               boolean are written to both the inspection and its incident. Closure occurs only
               when the evidence is verified and every material response action is proven.
+              If validators return <code>ACTION_REQUIRED</code>, the recorded inspector uses
+              <b>File correction</b> to replace the findings and evidence. Each attempt is counted,
+              re-fetched, re-hashed, and reviewed before the incident can close.
             </p>
             <a class="sample-link" href="https://raw.githubusercontent.com/AbstrusImad/fieldsignal/main/docs/evidence/inspection-pm25.md" target="_blank">
               OPEN SAMPLE INSPECTION EVIDENCE <ExternalLink />
@@ -180,8 +185,14 @@ defineProps({
           <div class="chapter-copy">
             <small>ACCESS CONTROL</small>
             <h2>Roles and permissions</h2>
+            <ol>
+              <li>Connect the contract owner and open <b>Access</b>.</li>
+              <li>Enter a wallet, enable Operator and/or Inspector, and choose a station when assigning operator authority.</li>
+              <li>Confirm <b>Apply authorization</b>. One contract call updates both role records and the optional station assignment.</li>
+              <li>To revoke access, submit the wallet again with the corresponding role disabled. Pending consensus rechecks the recorded actor.</li>
+            </ol>
             <div class="role-table">
-              <div><b>OWNER</b><span>Activate or revoke operators and inspectors.</span></div>
+              <div><b>OWNER</b><span>Atomically activate or revoke operators and inspectors, and bind a station to its recorded operator.</span></div>
               <div><b>OPERATOR</b><span>Enroll sensors, submit readings, and dispatch inspections.</span></div>
               <div><b>INSPECTOR</b><span>Submit findings only for the inspection assigned to that wallet.</span></div>
               <div><b>VALIDATORS</b><span>Retrieve evidence and agree on bounded state transitions.</span></div>
@@ -207,7 +218,7 @@ defineProps({
             </div>
             <div class="troubleshooting">
               <TriangleAlert />
-              <p><b>Common expected rejection:</b> “Authorized operator required” means the connected wallet lacks the needed role. “Recorded inspector required” means the wallet is not the stored assignee. “Public HTTPS evidence required” means the source is absent or unsupported. These are contract protections, not wallet failures.</p>
+              <p><b>Common expected rejection:</b> "Authorized station operator required" means the connected wallet lacks active authority. "Only recorded assignee may submit" means the wallet is not the stored inspector. "Recorded inspector role is not active" means authorization was revoked before consensus. These are contract protections, not wallet failures.</p>
             </div>
           </div>
         </section>
@@ -291,4 +302,3 @@ defineProps({
   .role-table div { grid-template-columns: 1fr; gap: 4px; }.guide-finish { grid-template-columns: 40px 1fr; }.guide-finish a { grid-column: 1 / -1; text-align: center; }
 }
 </style>
-

@@ -88,7 +88,7 @@ const connectedState = {
   loaderVisible,
   surveyLoaded: await connected.getByText("INSTRUMENT FIELD RECORD", { exact: true }).isVisible(),
 };
-for (const target of ["TRACES", "RESPONSE"]) {
+for (const target of ["TRACES", "RESPONSE", "ACCESS"]) {
   await connected.getByRole("button", { name: new RegExp(target) }).click();
   connectedState[`${target.toLowerCase()}LoaderVisible`] = await connected
     .locator(".chain-loader")
@@ -97,6 +97,10 @@ for (const target of ["TRACES", "RESPONSE"]) {
     .catch(() => false);
   await connected.locator(".chain-loader").waitFor({ state: "hidden", timeout: 90_000 });
 }
+connectedState.accessRegistryVisible = await connected
+  .getByText("ON-CHAIN FIELD CREDENTIALS", { exact: true })
+  .isVisible();
+await connected.screenshot({ path: "C:/tmp/fieldsignal-desktop-access.png" });
 await connected.close();
 await browser.close();
 console.log(JSON.stringify({ viewports: results, connectedState }, null, 2));
